@@ -1,0 +1,381 @@
+# Release — bluerock + bluerock-oss (two-wheel publish)
+# Pipeline: build-wheels-oss + build-wheels-python → test-release → create-release (draft)
+#                                                   → publish-testpypi → verify-testpypi → publish-pypi → finalize-release
+# Publish order: bluerock-oss first (so bluerock[oss] can resolve the dependency)
+#
+# Set the repo variable SKIP_TESTPYPI=true to bypass the TestPyPI
+# publish + verify phase and release straight to PyPI. Leave unset
+# (or set to anything other than 'true') for the normal path that
+# stages on TestPyPI first.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# only one release runs at a time per tag. we don't cancel an in-flight
+# publish — a half-written draft release with half-uploaded wheels is
+# worse than waiting a few minutes for the previous run to finish.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  build-wheels-oss:
+    runs-on: ${{ matrix.runner }}
+    # cibuildwheel across 5 cpython versions × the OS matrix can take
+    # 30-45 min; 60 gives headroom without letting a hung runner linger.
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            archs: "x86_64"
+            platform: linux
+          - runner: ubuntu-24.04-arm
+            archs: "aarch64"
+            platform: linux
+          - runner: macos-latest
+            archs: "x86_64 arm64"
+            # archs_tag replaces the space in archs so the artifact
+            # name stays shell-friendly (no manual-download quoting).
+            archs_tag: "x86_64-arm64"
+            platform: macos
+    # id-token + attestations: write are needed to sign a provenance
+    # attestation for each built wheel (SLSA build-provenance). users
+    # can verify a wheel actually came from this workflow with
+    # `gh attestation verify`.
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Extract version from tag
+        id: version
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          VERSION="${REF_NAME#v}"
+          # validate the tag name is plain version text before letting it
+          # flow into setuptools-scm and cibuildwheel env variables. if
+          # someone ever pushes a tag like "v1.0.0; rm -rf /", we want to
+          # fail here, not let it be interpreted as shell inside the
+          # wheel builder.
+          if ! printf '%s' "$VERSION" | grep -qE '^[0-9A-Za-z.+-]+$'; then
+            echo "::error::invalid version format: $VERSION"
+            echo "::error::tag must consist only of letters, digits, . + -"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Detect macOS deployment target from Rust toolchain
+        if: runner.os == 'macOS'
+        id: macos
+        run: |
+          TARGET=$(rustc --print deployment-target 2>/dev/null | cut -d= -f2 || echo "10.12")
+          if ! printf '%s' "$TARGET" | grep -qE '^[0-9]+\.[0-9]+$'; then
+            echo "::error::rustc returned an unexpected deployment target: '$TARGET'"
+            exit 1
+          fi
+          echo "deployment_target=$TARGET" >> "$GITHUB_OUTPUT"
+      - uses: pypa/cibuildwheel@ee02a1537ce3071a004a6b08c41e72f0fdc42d9a  # v3.4.0
+        with:
+          package-dir: acoustic/python-oss
+        env:
+          CIBW_BUILD: "cp310-* cp311-* cp312-* cp313-*"
+          CIBW_SKIP: "*-musllinux_* *-win32 *-manylinux_i686"
+          CIBW_ARCHS_LINUX: ${{ matrix.archs }}
+          CIBW_ARCHS_MACOS: ${{ matrix.archs }}
+          CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
+          CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
+          CIBW_BEFORE_ALL_LINUX: bash {project}/.github/scripts/install-rustup.sh
+          CIBW_BEFORE_ALL_MACOS: >-
+            rustup update stable && rustup default stable &&
+            rustup target add x86_64-apple-darwin aarch64-apple-darwin
+          CIBW_BEFORE_BUILD: "pip install -r .github/requirements/build-cibw.txt"
+          CIBW_ENVIRONMENT_LINUX: 'PATH="$HOME/.cargo/bin:$PATH" SETUPTOOLS_SCM_PRETEND_VERSION=${{ steps.version.outputs.VERSION }}'
+          CIBW_ENVIRONMENT_MACOS: 'MACOSX_DEPLOYMENT_TARGET=${{ steps.macos.outputs.deployment_target }} SETUPTOOLS_SCM_PRETEND_VERSION=${{ steps.version.outputs.VERSION }}'
+      - name: Sign build provenance for wheels
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be  # v2.4.0
+        with:
+          subject-path: 'wheelhouse/*.whl'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: wheels-oss-${{ matrix.runner }}-${{ matrix.archs_tag || matrix.archs }}
+          path: wheelhouse/*.whl
+
+  build-wheels-python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # see build-wheels-oss for why these permissions exist.
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Extract version from tag
+        id: version
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          VERSION="${REF_NAME#v}"
+          # validate the tag name is plain version text before letting it
+          # flow into setuptools-scm and cibuildwheel env variables. if
+          # someone ever pushes a tag like "v1.0.0; rm -rf /", we want to
+          # fail here, not let it be interpreted as shell inside the
+          # wheel builder.
+          if ! printf '%s' "$VERSION" | grep -qE '^[0-9A-Za-z.+-]+$'; then
+            echo "::error::invalid version format: $VERSION"
+            echo "::error::tag must consist only of letters, digits, . + -"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+      - run: pip install -r .github/requirements/build.txt
+      - name: Build bluerock wheel
+        run: cd acoustic/python && python -m build --wheel
+        env:
+          SETUPTOOLS_SCM_PRETEND_VERSION: ${{ steps.version.outputs.VERSION }}
+      - name: Sign build provenance for wheel
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be  # v2.4.0
+        with:
+          subject-path: 'acoustic/python/dist/*.whl'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: wheels-bluerock
+          path: acoustic/python/dist/*.whl
+
+  test-release:
+    runs-on: ubuntu-latest
+    needs: [build-wheels-oss, build-wheels-python]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: acoustic/python/pyproject.toml
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          pattern: wheels-oss-*
+          path: dist/oss/
+          merge-multiple: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          name: wheels-bluerock
+          path: dist/bluerock/
+      # install bluerock first — bluerock-oss lists it as a dependency,
+      # so pip needs to see it locally before it will install the other.
+      # --find-links lets pip pick the matching wheel for this runner's
+      # platform and Python version.
+      - run: |
+          pip install dist/bluerock/*.whl pytest -r .github/requirements/test.txt
+          pip install bluerock-oss --no-index --find-links dist/oss/
+      - name: Verify version matches tag
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          ACTUAL=$(python -c 'from importlib.metadata import version; print(version("bluerock"))')
+          EXPECTED=$(python -c "import os; from packaging.version import Version; print(Version(os.environ['TAG_NAME'].removeprefix('v')))")
+          echo "Expected: $EXPECTED, Got: $ACTUAL"
+          [ "$ACTUAL" = "$EXPECTED" ]
+      - name: Verify DSO resolution
+        run: python -c "import bluerock_oss; print(bluerock_oss.get_dso_path())"
+      - run: pytest acoustic/python/tests/test_bluepython_import.py acoustic/python/tests/test_smoke.py -v --no-header
+      - name: Run OSS integration tests
+        working-directory: acoustic/python
+        run: PYTHONPATH=.. python ../run-tests-oss.py --skip-missing-deps
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: [test-release]
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          pattern: wheels-oss-*
+          path: dist/oss/
+          merge-multiple: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          name: wheels-bluerock
+          path: dist/bluerock/
+      - run: gh release create "$TAG" dist/oss/*.whl dist/bluerock/*.whl --draft --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+
+  publish-testpypi:
+    runs-on: ubuntu-latest
+    needs: [test-release]
+    # bypass when SKIP_TESTPYPI=true. publish-pypi below is configured
+    # to still run when this job is skipped.
+    if: vars.SKIP_TESTPYPI != 'true'
+    timeout-minutes: 15
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/bluerock
+    permissions:
+      id-token: write
+    steps:
+      # publish bluerock-oss first, so that when bluerock is published
+      # next, any install that asks for bluerock[oss] can resolve the
+      # extra immediately.
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          pattern: wheels-oss-*
+          path: dist/oss/
+          merge-multiple: true
+      - uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e  # v1.13.0
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist/oss/
+          # skip_existing lets an operator re-run the workflow after a
+          # partial upload (e.g. transient TestPyPI 500 between the two
+          # publish steps below) without manually deleting prior wheels.
+          # safe because TestPyPI versions are immutable.
+          skip-existing: true
+      # then publish bluerock.
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          name: wheels-bluerock
+          path: dist/bluerock/
+      - uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e  # v1.13.0
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist/bluerock/
+          skip-existing: true
+
+  verify-testpypi:
+    runs-on: ubuntu-latest
+    needs: [publish-testpypi]
+    # skipped together with publish-testpypi when SKIP_TESTPYPI=true.
+    if: vars.SKIP_TESTPYPI != 'true'
+    # up to 8 retry attempts with exponential backoff (10,20,40,60,60,60,60,60s
+    # ≈ 6 min total) + install + import check. PyPI index propagation
+    # after upload can exceed 60s under load, so a short linear wait
+    # produced false negatives; exponential backoff with a hard 60s cap
+    # is a better shape than a flat 10s.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install from TestPyPI and verify
+        run: |
+          EXPECTED="${GITHUB_REF_NAME#v}"
+          INSTALLED=false
+          DELAY=10
+          for attempt in 1 2 3 4 5 6 7 8; do
+            if pip install --index-url https://test.pypi.org/simple/ \
+                 --extra-index-url https://pypi.org/simple/ \
+                 "bluerock[oss]==$EXPECTED" 2>&1; then
+              INSTALLED=true
+              break
+            fi
+            echo "Attempt $attempt: package not yet available, retrying in ${DELAY}s..."
+            sleep "$DELAY"
+            DELAY=$(( DELAY * 2 ))
+            if [ "$DELAY" -gt 60 ]; then DELAY=60; fi
+          done
+          if [ "$INSTALLED" != "true" ]; then
+            echo "::error::Failed to install bluerock[oss]==$EXPECTED from TestPyPI after 8 attempts"
+            exit 1
+          fi
+          python -c "
+          import os
+          from importlib.metadata import version
+          v = version('bluerock')
+          expected = os.environ['GITHUB_REF_NAME'].removeprefix('v')
+          print(f'TestPyPI OK: {v}')
+          assert v == expected, f'Version mismatch: {v} != {expected}'
+          import bluerock_oss
+          print(f'DSO: {bluerock_oss.get_dso_path()}')
+          "
+
+  publish-pypi:
+    runs-on: ubuntu-latest
+    needs: [verify-testpypi, create-release]
+    # run when create-release succeeded AND verify-testpypi either
+    # passed or was intentionally skipped via SKIP_TESTPYPI=true. the
+    # SKIP_TESTPYPI check is load-bearing: a transient publish-testpypi
+    # failure would otherwise mark verify-testpypi as 'skipped' (because
+    # it `needs: publish-testpypi` without `if: always()`), and treating
+    # any 'skipped' as success would let un-verified wheels reach PyPI
+    # during a TestPyPI outage. requiring the explicit vars.SKIP_TESTPYPI
+    # gate closes that bypass.
+    if: |
+      always()
+      && needs.create-release.result == 'success'
+      && (needs.verify-testpypi.result == 'success'
+          || (needs.verify-testpypi.result == 'skipped' && vars.SKIP_TESTPYPI == 'true'))
+    timeout-minutes: 15
+    environment:
+      name: pypi
+      url: https://pypi.org/p/bluerock
+    permissions:
+      id-token: write
+    steps:
+      # publish bluerock-oss first, so that when bluerock is published
+      # next, any install that asks for bluerock[oss] can resolve the
+      # extra immediately.
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          pattern: wheels-oss-*
+          path: dist/oss/
+          merge-multiple: true
+      - uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e  # v1.13.0
+        with:
+          packages-dir: dist/oss/
+          # skip_existing lets an operator re-run the workflow after a
+          # partial upload (e.g. bluerock-oss succeeds but bluerock
+          # fails on a transient 5xx) without having to cut a new
+          # version. PyPI versions are immutable.
+          skip-existing: true
+      # then publish bluerock.
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          name: wheels-bluerock
+          path: dist/bluerock/
+      - uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e  # v1.13.0
+        with:
+          packages-dir: dist/bluerock/
+          skip-existing: true
+
+  finalize-release:
+    runs-on: ubuntu-latest
+    needs: [publish-pypi]
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - run: gh release edit "$TAG" --draft=false --repo "$REPO"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}

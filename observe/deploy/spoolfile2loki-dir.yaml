@@ -1,0 +1,18 @@
+# spoolfile2loki configuration — directory mode.
+# Reads NDJSON rolling log files from spool_dir.
+
+loki_endpoint: "http://loki:3100"
+
+loki_retry:
+  max_retries: 10
+  retry_delay: 2s
+
+poll_interval: 60s
+batch_size: 100
+state_file: "/var/spoolfile2loki/state"
+log_level: "info"
+spool_dir: "/data/spool"
+
+labels:
+  environment: "dev"
+  source: "spoolfile2loki"

@@ -1,0 +1,35 @@
+# Loki endpoint (the code appends /loki/api/v1/push)
+loki_endpoint: "http://localhost:3100"
+
+# Optional: Loki retry configuration (default: max_retries=10, retry_delay=2s)
+# If Loki push fails this many times in a row, the application will crash
+# loki_retry:
+#   max_retries: 10      # Number of retry attempts before crashing
+#   retry_delay: 2s      # Wait time between retries
+
+# Poll interval for checking the spool file (default: 60s)
+poll_interval: 60s
+
+# Batch size for sending events to Loki (default: 100)
+batch_size: 100
+
+# State file for tracking last forwarded timestamp (default: spoolfile2loki.state)
+# This prevents duplicate forwarding on restart
+state_file: "/var/spoolfile2loki/state"
+
+# Log level: error, warning, info, or debug (default: info)
+log_level: "info"
+
+# Directory of rolling NDJSON spool files produced by the sensor agent.
+# Each line must have the format: {"ts": <unix_ms>, "event": {...}}
+# Required unless mock is true. Mutually exclusive with spool_file.
+spool_dir: "/data/spool"
+
+# Enable mock mode: replays embedded acoustic-lite sample events every poll_interval,
+# shifting timestamps to the current time. Useful for testing without a live sensor.
+# mock: false
+
+# Optional: global labels applied to every Loki stream
+# labels:
+#   environment: "production"
+#   host: "node-01"

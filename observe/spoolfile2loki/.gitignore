@@ -1,0 +1,3 @@
+spoolfile2loki
+!cmd/spoolfile2loki/
+*.state

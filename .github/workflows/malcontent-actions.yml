@@ -1,0 +1,87 @@
+# analyze changes to GitHub Actions workflow files for signs of
+# malicious behavior. runs malcontent in diff mode on the old and new
+# versions of any workflow touched by the PR, and uploads the results
+# as an artifact. malcontent-comment.yml picks up the artifact later
+# and posts the findings as a PR comment.
+#
+# based on: some-natalie/some-natalie/malcontent/
+name: Malcontent Actions Analysis
+
+on:
+  pull_request:
+    paths: ['.github/workflows/**']
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Prepare old and new workflow trees
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          mkdir -p /tmp/malcontent-old /tmp/malcontent-new
+
+          # extract changed workflow files at base and head
+          CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- .github/workflows/)
+          if [ -z "$CHANGED" ]; then
+            echo "No workflow files changed"
+            echo "NO_CHANGES" > /tmp/malcontent-results.txt
+            exit 0
+          fi
+
+          echo "Changed workflows:"
+          echo "$CHANGED"
+
+          for f in $CHANGED; do
+            mkdir -p "/tmp/malcontent-old/$(dirname "$f")"
+            mkdir -p "/tmp/malcontent-new/$(dirname "$f")"
+            git show "$BASE_SHA:$f" > "/tmp/malcontent-old/$f" 2>/dev/null || true
+            git show "$HEAD_SHA:$f" > "/tmp/malcontent-new/$f" 2>/dev/null || true
+          done
+
+      - name: Run malcontent diff
+        run: |
+          if [ -f /tmp/malcontent-results.txt ]; then
+            echo "Skipping — no changes detected"
+            exit 0
+          fi
+          # strict gate: any non-zero exit from malcontent diff means
+          # it flagged a behaviour change in a workflow file that needs
+          # closer review before merge. the artifact upload below uses
+          # if: always() so the PR comment has context either way.
+          set +e
+          docker run --rm \
+            -v /tmp/malcontent-old:/old:ro \
+            -v /tmp/malcontent-new:/new:ro \
+            cgr.dev/chainguard/malcontent@sha256:e08363fefacfedad3bbfa93059846e49ecfd1da9308b25b8a94945d8bd3557bc \
+            diff /old /new \
+            > /tmp/malcontent-results.txt 2>&1
+          MAL_EXIT=$?
+          set -e
+          echo "=== malcontent diff output ==="
+          cat /tmp/malcontent-results.txt
+          if [ "$MAL_EXIT" -ne 0 ]; then
+            echo "::error::malcontent diff flagged changes (exit $MAL_EXIT)"
+            exit "$MAL_EXIT"
+          fi
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: malcontent-actions-results
+          path: /tmp/malcontent-results.txt
+          retention-days: 7
+          if-no-files-found: ignore

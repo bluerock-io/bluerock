@@ -1,0 +1,104 @@
+# Copyright (C) 2025 BlueRock Security, Inc.
+# Licensed under the Apache License, Version 2.0 (see the `license`
+# field below and the top-level LICENSE file).
+
+[project]
+name = "bluerock"
+dynamic = ["version"]
+description = "Runtime security sensor for Python — monitors imports, process execution, dynamic code, network calls, and AI frameworks"
+readme = "PYPI_README.md"
+license = {text = "Apache-2.0"}
+requires-python = ">=3.10"
+authors = [
+    {name = "BlueRock Security", email = "pypi@bluerock.io"},
+]
+keywords = [
+    "security",
+    "runtime-monitoring",
+    "python-sensor",
+    "ndjson",
+    "instrumentation",
+    "audit-hooks",
+    "ai-security",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Rust",
+    "Topic :: Security",
+    "Topic :: System :: Monitoring",
+]
+dependencies = [
+    "bytecode>=0.15",
+    "pydantic>=2.9.2",
+    "rapidfuzz>=3.0",
+    "wrapt>=1.16",
+]
+
+[project.optional-dependencies]
+oss = [
+    "bluerock-oss",
+    "numpy>=1.26",
+    "pyyaml>=6.0.2",
+    "requests>=2.32",
+]
+test = [
+    "scikit-learn>=1.5",
+    "aiohttp>=3.13.4",  # CVE floor: GHSA-p998-jp59-783m and 9 related — fixed in 3.13.4
+    "dill>=0.3.8",
+    "pyyaml>=6.0.2",
+    "numpy>=1.26",
+    "requests>=2.32",
+    "flask>=3.0",
+    "py7zr>=0.22",
+    "httpx>=0.27",
+    "openai>=1.50",
+    "google-genai>=1.0",
+    "langchain>=0.3",
+    "langgraph>=0.2",
+    "langchain-google-genai>=2.0",
+    "langchain-anthropic>=0.3",
+    "anthropic>=0.40",
+    "litellm>=1.54",
+    "opentelemetry-api>=1.28",
+    "opentelemetry-sdk>=1.28",
+]
+mcp = [
+    "mcp>=1.0",
+    "fastmcp>=0.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/bluerock-io/bluerock"
+Documentation = "https://github.com/bluerock-io/bluerock#readme"
+Repository = "https://github.com/bluerock-io/bluerock"
+Issues = "https://github.com/bluerock-io/bluerock/issues"
+Changelog = "https://github.com/bluerock-io/bluerock/releases"
+
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[tool.black]
+line-length = 120
+
+[tool.setuptools]
+packages = ["bluepython", "bluepython.sdk"]
+
+[tool.setuptools_scm]
+fallback_version = "0.0.0.dev0"
+
+
+[tool.uv.sources]
+bluerock-oss = { workspace = true }
+
+[tool.uv.workspace]
+members = ["../python-oss"]

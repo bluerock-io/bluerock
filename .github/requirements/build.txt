@@ -1,0 +1,7 @@
+# Host-side build tools for CI. cibuildwheel handles wheel repair internally
+# (auditwheel on Linux, delocate on macOS, delvewheel on Windows) and runs the
+# Rust DSO build inside its own container — setuptools-rust lives in build-cibw.txt
+# for that container, not here on the host.
+build==1.2.2.post1
+setuptools-scm==8.1.0
+cibuildwheel==2.23.3

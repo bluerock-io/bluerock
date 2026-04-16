@@ -1,0 +1,126 @@
+name: Scorecards supply-chain security
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "30 4 * * 0"  # weekly Sunday 04:30 UTC
+  branch_protection_rule:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  analysis:
+    name: Scorecards analysis
+    # scorecard requires public repo or GHAS — skip on private pre-prod repo
+    if: github.repository == 'bluerock-io/bluerock'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      security-events: write
+      id-token: write
+      contents: read
+      actions: read
+      issues: read
+      pull-requests: read
+      checks: read
+      statuses: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Run analysis
+        uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a  # v2.4.3
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: SARIF file
+          path: results.sarif
+          retention-days: 5
+
+      - name: Upload to code-scanning
+        uses: github/codeql-action/upload-sarif@5c8a8a642e79153f5d047b10ec1cba1d1cc65699  # v3.35.1
+        with:
+          sarif_file: results.sarif
+
+  analysis-private:
+    name: Scorecards analysis (private repo fallback)
+    if: github.repository != 'bluerock-io/bluerock'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # scorecard looks at commits, PRs, issues, and check results via
+    # GraphQL, so it needs read access to each of those surfaces.
+    permissions:
+      contents: read
+      actions: read
+      issues: read
+      pull-requests: read
+      checks: read
+      statuses: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install scorecard (with checksum verification)
+        run: |
+          SCORECARD_VERSION=5.4.0
+          TARBALL="scorecard_${SCORECARD_VERSION}_linux_amd64.tar.gz"
+          BASE_URL="https://github.com/ossf/scorecard/releases/download/v${SCORECARD_VERSION}"
+          # --fail makes curl exit non-zero on HTTP 4xx/5xx so the job
+          # fails loudly if the download URL is broken, instead of
+          # silently saving an HTML error page as "scorecard".
+          curl -sSLfO "${BASE_URL}/${TARBALL}"
+          curl -sSLfO "${BASE_URL}/scorecard_checksums.txt"
+          grep "  ${TARBALL}$" scorecard_checksums.txt | sha256sum -c -
+          tar xzf "${TARBALL}"
+          chmod +x scorecard
+      - name: Run scorecard (JSON output)
+        env:
+          GITHUB_AUTH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          # note: CI-Tests is intentionally left out of the list — it
+          # needs commit-status read access that the default workflow
+          # token doesn't have on private repos.
+          CHECKS="Binary-Artifacts,Branch-Protection,CII-Best-Practices,Code-Review,Contributors,Dangerous-Workflow,Dependency-Update-Tool,Fuzzing,License,Maintained,Packaging,Pinned-Dependencies,SAST,Security-Policy,Signed-Releases,Token-Permissions,Vulnerabilities"
+          # keep stderr and stdout separate. scorecard emits its JSON
+          # report on stdout and puts warnings + per-check errors on
+          # stderr; merging them would give us invalid JSON to parse.
+          ./scorecard \
+            --repo="github.com/$REPO" \
+            --format=json \
+            --show-details \
+            --checks="$CHECKS" \
+            > scorecard-results.json 2>scorecard-stderr.log \
+            && SCORECARD_EXIT=0 || SCORECARD_EXIT=$?
+          if [ -s scorecard-stderr.log ]; then
+            echo "::group::scorecard stderr (warnings / check errors)"
+            cat scorecard-stderr.log
+            echo "::endgroup::"
+          fi
+          if ! jq empty scorecard-results.json 2>/dev/null; then
+            echo "::error::Scorecard produced invalid JSON output (exit=$SCORECARD_EXIT)"
+            head -200 scorecard-results.json
+            exit 1
+          fi
+          SCORE=$(jq -r '.score // -1' scorecard-results.json)
+          echo "Aggregate score: $SCORE"
+          jq '.checks[] | {name, score, reason}' scorecard-results.json
+          if [ "$SCORE" = "-1" ]; then
+            echo "::error::Scorecard failed to produce a valid score"
+            exit 1
+          fi
+      - name: Upload artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: scorecard-json
+          path: scorecard-results.json
+          retention-days: 30

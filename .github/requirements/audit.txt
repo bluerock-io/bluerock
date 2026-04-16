@@ -1,0 +1,2 @@
+# CI audit tools. Dependabot bumps automatically.
+pip-audit==2.9.0

@@ -1,0 +1,4 @@
+# oss deps live in pyproject.toml [optional-dependencies.oss] + uv.lock.
+# this shim exists for backward compat with pip install -r.
+-e ".[oss]"
+-e ../python-oss

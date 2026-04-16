@@ -1,0 +1,94 @@
+# Post malcontent findings as a PR comment, triggered by workflow_run
+# after malcontent-actions or malcontent-diff finishes.
+#
+# Why split analyze + comment into two workflows? Fork-PR safety. The
+# analyze jobs run against the PR's code with read-only permissions;
+# this comment job runs against the base repo with a write token,
+# AFTER the analyze job exits. Untrusted PR code never sees a
+# write-capable token.
+name: Malcontent PR Comment
+
+on:
+  workflow_run:
+    workflows: ["Malcontent Actions Analysis", "Malcontent Code Analysis"]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  comment:
+    # Run on success AND failure. Malcontent exits non-zero when it
+    # flags something — that's exactly when reviewers need the findings
+    # on the PR. The analyze workflow's artifact upload uses
+    # `if: always()`, so findings are present regardless of conclusion.
+    # cancelled / skipped → nothing to report, drop.
+    if: github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+      actions: read
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+        continue-on-error: true
+
+      - name: Post PR comment
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea  # v7.0.1
+        env:
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            // find all result files from downloaded artifacts
+            let body = '';
+            const dirs = fs.readdirSync('.').filter(d => {
+              try { return d.startsWith('malcontent-') && fs.statSync(d).isDirectory(); }
+              catch { return false; }
+            });
+
+            // Pick a fence length longer than any backtick run in
+            // the content. Without this, malcontent output containing
+            // triple-backticks (e.g. an analyzed markdown file) breaks
+            // the outer code block and the rest renders as raw markdown.
+            const pickFence = (s) => {
+              const runs = [...s.matchAll(/`+/g)].map(m => m[0].length);
+              const max = runs.length ? Math.max(...runs) : 0;
+              return '`'.repeat(Math.max(3, max + 1));
+            };
+
+            for (const dir of dirs) {
+              const files = fs.readdirSync(dir).filter(f => f.endsWith('.txt'));
+              for (const f of files) {
+                const content = fs.readFileSync(path.join(dir, f), 'utf8').trim();
+                if (content && content !== 'NO_CHANGES') {
+                  const label = dir.includes('actions') ? 'Actions' : 'Code';
+                  const fence = pickFence(content);
+                  body += `### Malcontent ${label} Analysis\n\n${fence}\n${content}\n${fence}\n\n`;
+                }
+              }
+            }
+
+            if (!body) {
+              console.log('No malcontent findings to report');
+              return;
+            }
+
+            body = '## Malcontent Analysis\n\n' + body;
+            body += `\n---\n*Run: [${process.env.RUN_ID}](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${process.env.RUN_ID})*`;
+
+            // find the PR number from the triggering workflow run
+            const prNumbers = context.payload.workflow_run.pull_requests.map(pr => pr.number);
+            for (const prNumber of prNumbers) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: body,
+              });
+              console.log(`Posted malcontent comment on PR #${prNumber}`);
+            }

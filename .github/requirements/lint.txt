@@ -1,0 +1,4 @@
+# CI lint tools. Dependabot bumps automatically.
+black==26.1.0
+ruff==0.11.12
+pip-tools==7.4.1

@@ -1,0 +1,4 @@
+# CI test deps. Dependabot bumps automatically.
+# fastmcp pins its own mcp + pydantic versions, don't override them
+fastmcp==2.14.6
+pytest==8.3.5

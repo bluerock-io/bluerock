@@ -1,0 +1,79 @@
+# analyze PR code changes for signs of malicious behavior. runs
+# malcontent analyze on the files touched by the PR and uploads the
+# results as an artifact. malcontent-comment.yml picks up the artifact
+# later and posts the findings as a PR comment.
+name: Malcontent Code Analysis
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Collect changed files
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          mkdir -p /tmp/malcontent-pr
+
+          # copy changed files (not deleted) to analysis directory
+          git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" | while read -r f; do
+            if [ -f "$f" ]; then
+              mkdir -p "/tmp/malcontent-pr/$(dirname "$f")"
+              cp "$f" "/tmp/malcontent-pr/$f"
+            fi
+          done
+
+          FILE_COUNT=$(find /tmp/malcontent-pr -type f | wc -l)
+          echo "Files to analyze: $FILE_COUNT"
+
+          if [ "$FILE_COUNT" -eq 0 ]; then
+            echo "NO_CHANGES" > /tmp/malcontent-code-results.txt
+          fi
+
+      - name: Run malcontent analyze
+        run: |
+          if [ -f /tmp/malcontent-code-results.txt ]; then
+            echo "Skipping — no files to analyze"
+            exit 0
+          fi
+          # strict gate: malcontent's non-zero exit means it flagged
+          # something suspicious in the PR. the build fails so the
+          # findings get reviewed before merge. the artifact upload
+          # below uses if: always() so the PR comment has context.
+          set +e
+          docker run --rm \
+            -v /tmp/malcontent-pr:/src:ro \
+            cgr.dev/chainguard/malcontent@sha256:e08363fefacfedad3bbfa93059846e49ecfd1da9308b25b8a94945d8bd3557bc \
+            analyze /src \
+            > /tmp/malcontent-code-results.txt 2>&1
+          MAL_EXIT=$?
+          set -e
+          echo "=== malcontent analyze output ==="
+          cat /tmp/malcontent-code-results.txt
+          if [ "$MAL_EXIT" -ne 0 ]; then
+            echo "::error::malcontent analyze flagged issues (exit $MAL_EXIT)"
+            exit "$MAL_EXIT"
+          fi
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: malcontent-code-results
+          path: /tmp/malcontent-code-results.txt
+          retention-days: 7
+          if-no-files-found: ignore

@@ -1,0 +1,96 @@
+version: 2
+
+# all PRs target development so they go through the CI promotion cycle
+# (development -> CI pass -> promote to main).
+#
+# labels: [dependencies, auto-target-dev] are applied to every PR so
+# `label:auto-target-dev base:main` surfaces any that slipped through
+# to the default branch (e.g. a security update, which always targets
+# the default branch regardless of target-branch config).
+#
+# open-pull-requests-limit is set to keep the queue bounded — if this
+# is exceeded, the oldest PRs in the queue block new ones from opening,
+# which shows up in the UI instead of silently dropping.
+
+updates:
+  - package-ecosystem: pip
+    directory: /acoustic/python
+    target-branch: development
+    open-pull-requests-limit: 10
+    labels: [dependencies, auto-target-dev]
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+    groups:
+      python-deps:
+        update-types: [minor, patch]
+
+  - package-ecosystem: cargo
+    directory: /acoustic/python-oss
+    target-branch: development
+    open-pull-requests-limit: 10
+    labels: [dependencies, auto-target-dev]
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+    groups:
+      rust-deps:
+        update-types: [minor, patch]
+
+  - package-ecosystem: pip
+    directory: /.github/requirements
+    target-branch: development
+    open-pull-requests-limit: 10
+    labels: [dependencies, auto-target-dev]
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+    groups:
+      ci-tools:
+        patterns: ["*"]
+
+  # spoolfile2loki (go + docker) lives at observe/spoolfile2loki/ after
+  # oss-staging.toml's remap_dirs rewrites observe/aidash/grafana-opensource
+  # to observe on export. dependabot scans the post-remap tree.
+  - package-ecosystem: gomod
+    directory: /observe/spoolfile2loki
+    target-branch: development
+    open-pull-requests-limit: 10
+    labels: [dependencies, auto-target-dev]
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+    groups:
+      go-deps:
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directory: /observe/spoolfile2loki
+    target-branch: development
+    open-pull-requests-limit: 10
+    labels: [dependencies, auto-target-dev]
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: development
+    open-pull-requests-limit: 10
+    labels: [dependencies, auto-target-dev]
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]

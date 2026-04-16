@@ -1,0 +1,10 @@
+# MANIFEST.in
+
+# Include the entire contents of 'cfg' recursively
+recursive-include cfg *
+
+# Exclude the entire 'tests' directory
+prune tests
+
+global-exclude *.py[co]
+global-exclude __pycache__

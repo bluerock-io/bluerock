@@ -1,0 +1,15 @@
+# Default reviewers
+* @bluerock-io/bluerock
+
+# Python sensor
+acoustic/python/bluepython/ @bluerock-io/bluerock
+
+# bluerock-oss rust DSO
+acoustic/python-oss/ @bluerock-io/bluerock
+
+# CI/CD
+.github/workflows/ @bluerock-io/bluerock
+
+# Examples and docs
+examples/ @bluerock-io/bluerock
+*.md @bluerock-io/bluerock

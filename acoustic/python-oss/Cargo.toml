@@ -1,0 +1,23 @@
+# Copyright (C) 2026 BlueRock Security, Inc.
+# Licensed under the Apache License, Version 2.0 (see the `license`
+# field below and the top-level LICENSE file).
+
+[package]
+name = "acoustic-oss"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+
+[lib]
+name = "acoustic_oss"
+crate-type = ["cdylib"]
+
+[dependencies]
+chrono = { version = "0.4", features = [] }
+libc = "0.2"
+rustix = { version = "1", features = ["thread"] }
+serde_json = "1"
+thiserror = "2"
+
+[dev-dependencies]
+tempfile = "3"

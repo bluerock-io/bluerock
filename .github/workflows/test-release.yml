@@ -1,0 +1,235 @@
+# staging-only release rehearsal: build wheels, test them, and publish
+# a draft GitHub Release — but never push to PyPI. this is the same
+# build → test → draft-release shape the real release.yml uses, so a
+# failure here catches release issues before the real tag is cut.
+#
+# uses cibuildwheel via the pip CLI (rather than the cibuildwheel
+# GitHub Action) to stay compatible with repos that restrict which
+# third-party actions are allowed.
+name: Test Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# serialize on the tag ref. rapid tag-delete-and-repush can otherwise
+# produce two runs fighting over the same draft github release.
+concurrency:
+  group: test-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  build-wheels-oss:
+    runs-on: ${{ matrix.runner }}
+    # cibuildwheel can take 30-45 min on arm64 for all 5 cpython versions.
+    # 60 gives headroom without letting a hung runner linger.
+    timeout-minutes: 60
+    # permissions needed to sign a provenance attestation for each wheel
+    # (SLSA build-provenance). wheels produced here are test-only (not
+    # published to PyPI), but we still sign them so downstream
+    # verification works consistently against the real release wheels.
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            archs: "x86_64"
+            platform: linux
+          - runner: ubuntu-24.04-arm
+            archs: "aarch64"
+            platform: linux
+          - runner: macos-latest
+            archs: "x86_64 arm64"
+            archs_tag: "x86_64-arm64"
+            platform: macos
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Extract version from tag
+        id: version
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          VERSION="${REF_NAME#v}"
+          # validate the tag name is plain version text before letting it
+          # flow into setuptools-scm and cibuildwheel env variables. if
+          # someone ever pushes a tag like "v1.0.0; rm -rf /", we want to
+          # fail here, not let it be interpreted as shell inside the
+          # wheel builder.
+          if ! printf '%s' "$VERSION" | grep -qE '^[0-9A-Za-z.+-]+$'; then
+            echo "::error::invalid version format: $VERSION"
+            echo "::error::tag must consist only of letters, digits, . + -"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+      - run: pip install -r .github/requirements/build.txt
+      - name: Detect macOS deployment target from Rust toolchain
+        if: runner.os == 'macOS'
+        id: macos
+        run: |
+          TARGET=$(rustc --print deployment-target 2>/dev/null | cut -d= -f2 || echo "10.12")
+          # defensive: rustc normally prints "<major>.<minor>" (e.g. 10.12,
+          # 11.0), but the value flows into CIBW_ENVIRONMENT_MACOS as a
+          # shell-exported string — reject anything that isn't plain
+          # dotted numbers so a future rustc output change can't break
+          # the env block or inject shell syntax.
+          if ! printf '%s' "$TARGET" | grep -qE '^[0-9]+\.[0-9]+$'; then
+            echo "::error::rustc returned an unexpected deployment target: '$TARGET'"
+            exit 1
+          fi
+          echo "deployment_target=$TARGET" >> "$GITHUB_OUTPUT"
+      - name: Build bluerock-oss wheels
+        run: cibuildwheel --output-dir wheelhouse acoustic/python-oss
+        env:
+          CIBW_BUILD: "cp310-* cp311-* cp312-* cp313-*"
+          CIBW_SKIP: "*-musllinux_* *-win32 *-manylinux_i686"
+          CIBW_ARCHS_LINUX: ${{ matrix.archs }}
+          CIBW_ARCHS_MACOS: ${{ matrix.archs }}
+          CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
+          CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
+          CIBW_BEFORE_ALL_LINUX: bash {project}/.github/scripts/install-rustup.sh
+          CIBW_BEFORE_ALL_MACOS: >-
+            rustup update stable && rustup default stable &&
+            rustup target add x86_64-apple-darwin aarch64-apple-darwin
+          CIBW_BEFORE_BUILD: "pip install -r .github/requirements/build-cibw.txt"
+          CIBW_ENVIRONMENT_LINUX: 'PATH="$HOME/.cargo/bin:$PATH" SETUPTOOLS_SCM_PRETEND_VERSION=${{ steps.version.outputs.VERSION }}'
+          CIBW_ENVIRONMENT_MACOS: 'MACOSX_DEPLOYMENT_TARGET=${{ steps.macos.outputs.deployment_target }} SETUPTOOLS_SCM_PRETEND_VERSION=${{ steps.version.outputs.VERSION }}'
+      - name: Sign build provenance for wheels
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be  # v2.4.0
+        with:
+          subject-path: 'wheelhouse/*.whl'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: wheels-oss-${{ matrix.runner }}-${{ matrix.archs_tag || matrix.archs }}
+          path: wheelhouse/*.whl
+
+  build-wheels-python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # see build-wheels-oss for why these permissions exist.
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Extract version from tag
+        id: version
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          VERSION="${REF_NAME#v}"
+          # validate the tag name is plain version text before letting it
+          # flow into setuptools-scm and cibuildwheel env variables. if
+          # someone ever pushes a tag like "v1.0.0; rm -rf /", we want to
+          # fail here, not let it be interpreted as shell inside the
+          # wheel builder.
+          if ! printf '%s' "$VERSION" | grep -qE '^[0-9A-Za-z.+-]+$'; then
+            echo "::error::invalid version format: $VERSION"
+            echo "::error::tag must consist only of letters, digits, . + -"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+      - run: pip install -r .github/requirements/build.txt
+      - name: Build bluerock wheel
+        run: cd acoustic/python && python -m build --wheel
+        env:
+          SETUPTOOLS_SCM_PRETEND_VERSION: ${{ steps.version.outputs.VERSION }}
+      - name: Sign build provenance for wheel
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be  # v2.4.0
+        with:
+          subject-path: 'acoustic/python/dist/*.whl'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: wheels-bluerock
+          path: acoustic/python/dist/*.whl
+
+  test-release:
+    runs-on: ubuntu-latest
+    needs: [build-wheels-oss, build-wheels-python]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: acoustic/python/pyproject.toml
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          pattern: wheels-oss-*
+          path: dist/oss/
+          merge-multiple: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          name: wheels-bluerock
+          path: dist/bluerock/
+      # install bluerock first — bluerock-oss lists it as a dependency,
+      # so pip needs to see it locally first. the --find-links filter
+      # pins us to the manylinux wheels since this test runner is Linux.
+      - run: |
+          pip install dist/bluerock/*.whl pytest -r .github/requirements/test.txt
+          pip install bluerock-oss --no-index --find-links dist/oss/
+      - name: Verify version matches tag
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          ACTUAL=$(python -c 'from importlib.metadata import version; print(version("bluerock"))')
+          EXPECTED=$(python -c "import os; from packaging.version import Version; print(Version(os.environ['TAG_NAME'].removeprefix('v')))")
+          echo "Expected: $EXPECTED, Got: $ACTUAL"
+          [ "$ACTUAL" = "$EXPECTED" ]
+      - name: Verify DSO resolution
+        run: python -c "import bluerock_oss; print(bluerock_oss.get_dso_path())"
+      - run: pytest acoustic/python/tests/test_bluepython_import.py acoustic/python/tests/test_smoke.py -v --no-header
+      - name: Run OSS integration tests
+        working-directory: acoustic/python
+        run: PYTHONPATH=.. python ../run-tests-oss.py --skip-missing-deps
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: [test-release]
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          pattern: wheels-oss-*
+          path: dist/oss/
+          merge-multiple: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          name: wheels-bluerock
+          path: dist/bluerock/
+      - name: Create draft release with wheels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" dist/oss/*.whl dist/bluerock/*.whl --draft --generate-notes

@@ -1,0 +1,8 @@
+VERSION := `cat VERSION`
+IMAGE := "spoolfile2loki:" + VERSION
+GO_VERSION := `grep '^go ' go.mod | awk '{print $2}' | cut -d. -f1,2`
+
+# Build multi-arch container image (x86_64 + arm64)
+build:
+    @echo 'package internal\n\nconst Version = "{{VERSION}}"' > internal/version.go
+    docker buildx build --build-arg GO_VERSION={{GO_VERSION}} --platform linux/amd64,linux/arm64 -t {{IMAGE}} -t spoolfile2loki:latest .

@@ -1,0 +1,47 @@
+# Copyright (C) 2026 BlueRock Security, Inc.
+# Licensed under the Apache License, Version 2.0 (see the `license`
+# field below and the top-level LICENSE file).
+
+[project]
+name = "bluerock-oss"
+dynamic = ["version"]
+description = "Rust DSO backend for BlueRock — handles NDJSON event writing for the bluerock Python sensor"
+license = {text = "Apache-2.0"}
+requires-python = ">=3.10"
+authors = [
+    {name = "BlueRock Security", email = "pypi@bluerock.io"},
+]
+keywords = ["security", "runtime-monitoring", "bluerock", "rust", "ndjson"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Rust",
+    "Topic :: Security",
+]
+dependencies = ["bluerock"]
+
+[project.urls]
+Homepage = "https://github.com/bluerock-io/bluerock"
+Repository = "https://github.com/bluerock-io/bluerock"
+Issues = "https://github.com/bluerock-io/bluerock/issues"
+
+[build-system]
+requires = ["setuptools", "setuptools-scm", "setuptools-rust"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["bluerock_oss"]
+
+[[tool.setuptools-rust.ext-modules]]
+target = "bluerock_oss.libacoustic_oss"
+path = "Cargo.toml"
+binding = "NoBinding"
+
+[tool.setuptools_scm]
+fallback_version = "0.0.0.dev0"

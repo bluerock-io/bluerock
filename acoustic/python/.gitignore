@@ -1,0 +1,10 @@
+dist/
+bluerock.egg-info/
+__pycache__/
+/tests/good.txt
+/tests/my_file.txt
+/tests/persid.pkl
+/tests/scikit.pickle
+/tests/tmp/
+uv.lock
+/bluepython_test_logs

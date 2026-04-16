@@ -1,0 +1,16 @@
+# cargo-deny config — license and ban checks
+# Advisory checks are enabled by default (no config needed)
+
+[advisories]
+# Advisories run as a non-blocking check via continue-on-error in CI
+# (see .github/workflows/security-audit.yml — rust-advisories job).
+# This prevents upstream advisory-db parser incompatibilities from breaking
+# the main build. Real advisories still surface as warnings + weekly issues.
+ignore = ["RUSTSEC-2025-0138"]
+
+[licenses]
+allow = ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Unicode-3.0", "Zlib"]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "allow"
