@@ -259,6 +259,7 @@ python3 -m bluepython --oss [OPTIONS] [script.py | -m module] [args...]
 
 Options:
   --oss                Use the OSS backend (required for pip-installed bluerock)
+                       tip: auto-detected when bluerock-oss is installed if you forget.
   --cfg-dir DIR        Load sensor config from DIR/bluerock-oss.json (see CONFIG.md)
   -m MODULE            Run a Python module instead of a script
   -p, --path-traversal Enable path traversal event detection
