@@ -111,6 +111,7 @@ jobs:
           CIBW_ENVIRONMENT_LINUX: 'PATH="$HOME/.cargo/bin:$PATH" SETUPTOOLS_SCM_PRETEND_VERSION=${{ steps.version.outputs.VERSION }}'
           CIBW_ENVIRONMENT_MACOS: 'MACOSX_DEPLOYMENT_TARGET=${{ steps.macos.outputs.deployment_target }} SETUPTOOLS_SCM_PRETEND_VERSION=${{ steps.version.outputs.VERSION }}'
       - name: Sign build provenance for wheels
+        continue-on-error: true
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be  # v2.4.0
         with:
           subject-path: 'wheelhouse/*.whl'
@@ -158,6 +159,7 @@ jobs:
         env:
           SETUPTOOLS_SCM_PRETEND_VERSION: ${{ steps.version.outputs.VERSION }}
       - name: Sign build provenance for wheel
+        continue-on-error: true
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be  # v2.4.0
         with:
           subject-path: 'acoustic/python/dist/*.whl'

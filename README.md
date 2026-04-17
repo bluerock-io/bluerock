@@ -98,19 +98,19 @@ Every hooked operation emits a structured JSON event to an NDJSON log file at `~
 ┌──────────────────────────────────────────────────────────────┐
 │  python -m bluepython --oss your_app.py                      │
 │                                                              │
-│  ┌─────────────┐    ┌──────────────┐    ┌─────────────────┐  │
-│  │ audit hooks  │    │ import hooks │    │ framework hooks │  │
+│  ┌──────────────┐    ┌──────────────┐    ┌────────────────┐  │
+│  │ audit hooks  │    │ import hooks │    │ framework hooks│  │
 │  │ (subprocess, │    │ (SHA256,     │    │ (MCP, LLMs,    │  │
 │  │  ctypes)     │    │  versions)   │    │  and more)     │  │
-│  └──────┬───────┘    └──────┬───────┘    └───────┬─────────┘  │
-│         └──────────────┬────┘────────────────────┘           │
-│                        ▼                                     │
+│  └──────┬───────┘    └──────┬───────┘    └───────┬────────┘  │
+│         └───────────────┬───┘────────────────────┘           │
+│                         ▼                                    │
 │              ┌─────────────────┐                             │
 │              │ bluerock-oss    │  Rust DSO (libacoustic_oss) │
 │              │ NDJSON writer   │                             │
 │              └────────┬────────┘                             │
 │                       ▼                                      │
-│         ~/.bluerock/event-spool/*.ndjson                      │
+│         ~/.bluerock/event-spool/*.ndjson                     │
 └──────────────────────────────────────────────────────────────┘
                         │
           ┌─────────────┼──────────────────┐
