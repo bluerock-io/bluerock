@@ -59,105 +59,57 @@ jobs:
             --token "$GH_TOKEN" \
             --sha "$COMMIT_SHA"
 
-      - name: Promote development → main (fast-forward, merge fallback on divergence)
+      - name: Promote development → main
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.PROMOTE_TOKEN }}
           COMMIT_SHA: ${{ github.sha }}
           REPO: ${{ github.repository }}
         run: |
-          # primary path: fast-forward push of dev's sha to main. works
-          # for the common case where main is a strict ancestor of dev.
-          #
-          # divergence fallback: if main has moved independently (e.g.
-          # a grouped dependabot PR landed on dev while a single-package
-          # PR merged + promoted in parallel), the fast-forward push is
-          # rejected. we then use the merges API to create a merge
-          # commit on main that brings dev's state in, and align dev
-          # to that merge so the NEXT promote is a clean fast-forward.
-          #
-          # token travels in an http.extraheader (per-command only) so
-          # it doesn't end up embedded in a remote URL or persisted by
-          # the checkout step.
-          # match the identity used by the gitlab-side promote
-          # (validate-oss-qa + promote-oss-prod) so every commit landing
-          # on main is authored by the same user.
           set -eo pipefail
 
-          git config user.email "github-ci@bluerock.io"
-          git config user.name "BlueRock OSS CI"
+          PUSH_URL="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
 
-          PUSH_URL="https://github.com/${REPO}.git"
-          AUTH="http.https://github.com/.extraheader=AUTHORIZATION: bearer ${GH_TOKEN}"
-
-          # primary path: fast-forward.
-          if git -c "$AUTH" push "$PUSH_URL" "${COMMIT_SHA}:refs/heads/main" 2>/tmp/push-err; then
-            echo "Promoted: main now at $COMMIT_SHA"
+          # primary: fast-forward push for clean linear history.
+          if git push "$PUSH_URL" "${COMMIT_SHA}:refs/heads/main" 2>/dev/null; then
+            echo "Promoted: main now at $COMMIT_SHA (fast-forward)"
             exit 0
           fi
 
-          # only try the merge fallback for divergence errors. auth,
-          # permission, and missing-check failures are unrelated and
-          # should fail loudly with a clear message to the operator.
-          if ! grep -qE 'non.fast.forward|not a fast forward|cannot be fast-forwarded' /tmp/push-err; then
-            echo "::error::push to main rejected (not a divergence issue)"
-            cat /tmp/push-err
-            echo ""
-            echo "likely causes:"
-            echo "  - branch protection rules rejected the push (missing required checks)"
-            echo "  - the workflow token lacks contents:write on $REPO"
-            exit 1
-          fi
-
-          echo "main has diverged from $COMMIT_SHA; reconciling via a merge commit..."
-
-          # retry up to 3× on empty MERGE_SHA — covers transient 5xx
-          # without needing to parse error strings. a real file-level
-          # conflict (409) will fail all three and drop into the
-          # manual-recovery block below; the 35s worst-case latency
-          # on that path is acceptable.
+          # fallback: merges API handles divergence, auth edge cases,
+          # and non-ff rejections without error-string parsing.
+          # retry up to 3x — covers transient 5xx from the API.
+          echo "fast-forward push failed; falling back to merges API..."
           MERGE_SHA=""
           for DELAY in 5 10 20; do
-            MERGE_RESP=$(gh api -X POST "repos/${REPO}/merges" \
+            if MERGE_RESP=$(gh api -X POST "repos/${REPO}/merges" \
               -f base=main \
               -f head="$COMMIT_SHA" \
-              -f commit_message="Merge development into main (auto-reconcile $(printf '%s' "$COMMIT_SHA" | cut -c1-10))" \
-              2>/tmp/merge-err || true)
-            MERGE_SHA=$(printf '%s' "$MERGE_RESP" | jq -r '.sha // empty')
-            [ -n "$MERGE_SHA" ] && break
-            echo "merges api returned no sha; retrying in ${DELAY}s..."
+              -f commit_message="Merge development into main ($(printf '%s' "$COMMIT_SHA" | cut -c1-10))" \
+              2>/tmp/merge-err); then
+              if [ -n "$MERGE_RESP" ]; then
+                MERGE_SHA=$(printf '%s' "$MERGE_RESP" | jq -r '.sha // empty')
+              fi
+              break
+            fi
+            echo "merges API attempt failed; retrying in ${DELAY}s..."
             sleep "$DELAY"
           done
 
-          if [ -z "$MERGE_SHA" ]; then
-            echo "::error::auto-merge failed — likely a file-level conflict needing human review."
-            echo "API error:"
-            cat /tmp/merge-err
+          if [ -n "$MERGE_SHA" ]; then
+            echo "Promoted: main now at $MERGE_SHA (merge commit)"
+          elif [ -z "$(cat /tmp/merge-err 2>/dev/null)" ]; then
+            echo "Already up to date: main already contains $COMMIT_SHA"
+          else
+            echo "::error::merges API failed after retries."
+            echo "likely causes:"
+            echo "  - merge conflict needing manual resolution"
+            echo "  - PROMOTE_TOKEN lacks write access to $REPO"
+            echo "  - branch protection requires checks not present on this sha"
             echo ""
             echo "manual recovery:"
             echo "  gh api -X POST repos/${REPO}/merges \\"
-            echo "    -f base=development -f head=main \\"
-            echo "    -f commit_message='merge main into dev to unblock divergence'"
-            echo "  # then re-run this workflow from the Actions tab"
+            echo "    -f base=main -f head=${COMMIT_SHA} \\"
+            echo "    -f commit_message='merge dev into main (manual)'"
+            cat /tmp/merge-err
             exit 1
-          fi
-
-          echo "Promoted: main now at $MERGE_SHA (merge of dev $COMMIT_SHA into main)"
-
-          # align dev with the merge commit so the next PR merge on dev
-          # creates a commit whose ancestry includes main's new tip.
-          # without this, every subsequent promote would re-diverge and
-          # stack redundant merge commits on main.
-          # --force-with-lease protects against a concurrent PR merge
-          # that advanced dev between this workflow's trigger and now:
-          # if dev's tip no longer matches COMMIT_SHA, the push is
-          # rejected safely and the next promote picks up the new state.
-          if git -c "$AUTH" push "$PUSH_URL" \
-               --force-with-lease="refs/heads/development:${COMMIT_SHA}" \
-               "${MERGE_SHA}:refs/heads/development" 2>/tmp/align-err; then
-            echo "Aligned: development now at $MERGE_SHA"
-          else
-            echo "::warning::could not align development to the merge commit"
-            cat /tmp/align-err
-            echo ""
-            echo "non-fatal: main is correct; the next promote run will handle alignment."
           fi

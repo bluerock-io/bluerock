@@ -51,25 +51,9 @@ oss = [
     "requests>=2.32",
 ]
 test = [
-    "scikit-learn>=1.5",
-    "aiohttp>=3.13.4",  # CVE floor: GHSA-p998-jp59-783m and 9 related — fixed in 3.13.4
-    "dill>=0.3.8",
+    "aiohttp>=3.13.4",
     "pyyaml>=6.0.2",
-    "numpy>=1.26",
     "requests>=2.32",
-    "flask>=3.0",
-    "py7zr>=0.22",
-    "httpx>=0.27",
-    "openai>=1.50",
-    "google-genai>=1.0",
-    "langchain>=0.3",
-    "langgraph>=0.2",
-    "langchain-google-genai>=2.0",
-    "langchain-anthropic>=0.3",
-    "anthropic>=0.40",
-    "litellm>=1.54",
-    "opentelemetry-api>=1.28",
-    "opentelemetry-sdk>=1.28",
 ]
 mcp = [
     "mcp>=1.0",

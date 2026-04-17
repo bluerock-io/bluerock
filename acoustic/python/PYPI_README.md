@@ -1,6 +1,6 @@
 # BlueRock
 
-Runtime security sensor for Python applications. Monitors imports, process execution, dynamic code loading, deserialization, network calls, and AI framework interactions — emitting structured NDJSON events for every operation.
+Runtime security sensor for Python applications. Monitors MCP protocol interactions and module imports — emitting structured NDJSON events for every operation, with zero code changes.
 
 ## Install
 
@@ -15,10 +15,12 @@ This installs:
 
 ## Quick Start
 
-Run any Python script under BlueRock:
+Create a sensor config and run any Python script under BlueRock:
 
 ```bash
-python -m bluepython --oss your_script.py
+mkdir -p ~/.bluerock
+echo '{"enable": true, "mcp": true, "imports": true}' > ~/.bluerock/bluerock-oss.json
+python -m bluepython --oss --cfg-dir ~/.bluerock your_script.py
 ```
 
 Events are written to `~/.bluerock/event-spool/python-{pid}-{tid}.{generation}.ndjson`:
@@ -34,26 +36,16 @@ cat ~/.bluerock/event-spool/python-*.ndjson | jq .event
 | Category | Events |
 |----------|--------|
 | **Imports** | `python_import` — name, path, version, SHA256 |
-| **Dynamic code** | `python_builtins_exec` — eval/exec calls |
-| **Process spawn** | `python_os_system`, `python_subprocess_Popen` |
-| **ctypes** | `python_ctypes_dlopen`, `python_ctypes_dlsym` |
-| **Deserialization** | `python_pickle_find_class`, `python_pickle_reduce` |
-| **Archives** | `python_zip_slip` — zip/tar path traversal |
 
 ### Framework hooks (zero overhead if not imported)
 
 | Framework | Events |
 |-----------|--------|
-| **Flask** | `python_flask_call` |
-| **httpx** | `python_http_request` |
-| **Django** | `python_django_call` |
-| **MCP** | `python_mcp_event` |
-| **LangChain** | `python_langchain_event`, `python_langgraph_event` |
-| **CrewAI** | `python_crewai_event` |
-| **OpenAI/Anthropic/Gemini** | `python_llm_call`, `python_llm_reply` |
-| **OpenTelemetry** | `python_otel_span` |
+| **MCP** | `python_mcp_event`, `python_mcp_server_init`, `python_mcp_server_add`, `python_mcp_session_created`, `python_mcp_session_terminated`, `python_mcp_client_connect` |
 
-Framework hooks use `@wrapt.when_imported()` — loaded only when your application imports the framework.
+MCP hooks use `@wrapt.when_imported()` — loaded only when your application imports `mcp` or `fastmcp`.
+
+> **Want more?** The [full version](https://www.bluerock.io/try-bluerock) supports 30+ hook categories covering process spawns, dynamic code execution, serialization, HTTP frameworks, LLM APIs, and more.
 
 ## Event Format
 
@@ -90,10 +82,9 @@ Every line in the NDJSON log is a timestamped envelope wrapping an event. Use `j
 python3 -m bluepython --oss [OPTIONS] [script.py | -m module] [args...]
 
 Options:
-  --oss                Use OSS (bluerock_oss) DSO — required for pip-installed bluerock
+  --oss                Use OSS backend (also auto-detected when bluerock-oss is installed)
   --cfg-dir DIR        Load sensor config from DIR/bluerock-oss.json (see CONFIG.md)
   -m MODULE            Run a Python module instead of a script
-  -p, --path-traversal Enable path traversal event detection
   --debug              Print debug logs to stderr
   --install            Install bluerock autostart (sitecustomize)
   --uninstall          Remove bluerock autostart

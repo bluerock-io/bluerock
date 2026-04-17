@@ -146,4 +146,4 @@ Emitted when an unexpected error occurs inside the sensor.
 
 > **Remediation:** This release is monitoring-only. Policy enforcement and remediation (e.g., blocking a tool call, filtering resources based on server policy) are available in the [full version](https://www.bluerock.io/try-bluerock).
 
-> **Coming soon:** events for imports, subprocesses, serialization, web frameworks, LLM APIs, and more.
+> **Coming soon:** events for subprocesses, serialization, web frameworks, LLM APIs, and more. See [CONFIG.md](acoustic/python/CONFIG.md) for the full roadmap.

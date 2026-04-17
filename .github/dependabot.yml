@@ -16,7 +16,7 @@ updates:
   - package-ecosystem: pip
     directory: /acoustic/python
     target-branch: development
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     labels: [dependencies, auto-target-dev]
     schedule:
       interval: weekly
@@ -25,12 +25,12 @@ updates:
       semver-major-days: 14
     groups:
       python-deps:
-        update-types: [minor, patch]
+        patterns: ["*"]
 
   - package-ecosystem: cargo
     directory: /acoustic/python-oss
     target-branch: development
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     labels: [dependencies, auto-target-dev]
     schedule:
       interval: weekly
@@ -39,12 +39,12 @@ updates:
       semver-major-days: 14
     groups:
       rust-deps:
-        update-types: [minor, patch]
+        patterns: ["*"]
 
   - package-ecosystem: pip
     directory: /.github/requirements
     target-branch: development
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     labels: [dependencies, auto-target-dev]
     schedule:
       interval: weekly
@@ -61,7 +61,7 @@ updates:
   - package-ecosystem: gomod
     directory: /observe/spoolfile2loki
     target-branch: development
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     labels: [dependencies, auto-target-dev]
     schedule:
       interval: weekly
@@ -70,12 +70,12 @@ updates:
       semver-major-days: 14
     groups:
       go-deps:
-        update-types: [minor, patch]
+        patterns: ["*"]
 
   - package-ecosystem: docker
     directory: /observe/spoolfile2loki
     target-branch: development
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     labels: [dependencies, auto-target-dev]
     schedule:
       interval: weekly
@@ -85,7 +85,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     target-branch: development
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     labels: [dependencies, auto-target-dev]
     schedule:
       interval: weekly

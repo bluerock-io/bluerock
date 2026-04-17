@@ -32,8 +32,8 @@ These options are available in the open-source release:
 | `mcp` | AI agents | Model Context Protocol: tracks tool, resource, and messages |
 | `imports` | Supply chain | Custom `MetaPathFinder` in the import system; computes SHA-256 of every imported file and maps it to its package; detects hash changes between runs |
 | `debug` | Diagnostics | Enables verbose diagnostic output from the sensor itself to stderr |
-| `log_file` | Diagnostics | Routes low-level acoustic library traces to a file path (set value to the desired path) |
-| `log_stderr` | Diagnostics | Routes low-level acoustic library traces to stderr |
+| `log_file` | Diagnostics | Routes low-level sensor traces to a file path (set value to the desired path) |
+| `log_stderr` | Diagnostics | Routes low-level sensor traces to stderr |
 
 ## Full Version Config Options
 

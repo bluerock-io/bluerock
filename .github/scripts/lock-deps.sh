@@ -31,18 +31,13 @@ if [ -z "$PIP_TOOLS_VER" ]; then
     exit 1
 fi
 
-# always use a private venv, pinning pip<25 in the
-# venv catches this without touching the runner's global pip.
-if command -v uvx &>/dev/null; then
-    PIP_COMPILE=(uvx --from "pip-tools==${PIP_TOOLS_VER}" pip-compile)
-else
-    VENV="${TMPDIR:-/tmp}/lock-deps-venv"
-    if [ ! -x "$VENV/bin/pip-compile" ]; then
-        python3 -m venv "$VENV"
-        "$VENV/bin/pip" install -q "pip<25" "pip-tools==${PIP_TOOLS_VER}"
-    fi
-    PIP_COMPILE=("$VENV/bin/pip-compile")
+# always use a private venv with pip<25 pinned.
+VENV="${TMPDIR:-/tmp}/lock-deps-venv"
+if [ ! -x "$VENV/bin/pip-compile" ]; then
+    python3 -m venv "$VENV"
+    "$VENV/bin/pip" install -q "pip<25" "pip-tools==${PIP_TOOLS_VER}"
 fi
+PIP_COMPILE=("$VENV/bin/pip-compile")
 
 cd "$WORK_DIR"
 
@@ -58,11 +53,13 @@ cd "$WORK_DIR"
 normalize_lockfile() {
     local f="$1"
     sed -i -E \
+        -e '/^#    pip-compile /s| --[a-z_-]+=None||g' \
         -e 's|(--output-file=)[^[:space:]]+|\1requirements.lock|' \
         -e 's|^-e file://[^[:space:]]*/acoustic/python$|-e .|' \
         -e 's|^-e file://[^[:space:]]*/acoustic/python-oss$|-e ../python-oss|' \
         -e 's|^(    #   )file://[^[:space:]]*/acoustic/python$|\1.|' \
         -e 's|^(    #   )file://[^[:space:]]*/acoustic/python-oss$|\1../python-oss|' \
+        -e '/^    #   [-.]$/d' \
         "$f"
 }
 
@@ -76,7 +73,7 @@ if [[ "${1:-}" == "--verify" ]]; then
     # picks pypi-latest and drifts past the pin on every pypi release.
     cp "$REQUIREMENTS_LOCK" "$TMPLOCK"
     # capture stderr for pip-compile so failures surface in the log
-    if ! "${PIP_COMPILE[@]}" --generate-hashes --strip-extras \
+    if ! "${PIP_COMPILE[@]}" --strip-extras \
             --output-file="$TMPLOCK" \
             "$REQUIREMENTS_IN" -q 2>"$TMPERR"; then
         echo "lock-deps: pip-compile failed (new dep added?). run: .github/scripts/lock-deps.sh"
@@ -98,7 +95,7 @@ if [[ "${1:-}" == "--verify" ]]; then
     echo "lock-deps: $REQUIREMENTS_LOCK is up to date"
 else
     echo "lock-deps: generating $WORK_DIR/$REQUIREMENTS_LOCK from $REQUIREMENTS_IN..."
-    "${PIP_COMPILE[@]}" --generate-hashes --strip-extras \
+    "${PIP_COMPILE[@]}" --strip-extras \
         --output-file="$REQUIREMENTS_LOCK" \
         "$REQUIREMENTS_IN"
     normalize_lockfile "$REQUIREMENTS_LOCK"

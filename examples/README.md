@@ -93,7 +93,7 @@ See [mcp/README.md](mcp/README.md) for detailed per-example instructions.
 
 See [ai-hooks/mcp-monitoring/README.md](ai-hooks/mcp-monitoring/README.md) for a step-by-step walkthrough.
 
-> **More hook categories** (process spawns, HTTP frameworks, LLM APIs, serialization, and more) are available in the [full version](https://try.bluerock.io).
+> **More hook categories** (process spawns, HTTP frameworks, LLM APIs, serialization, and more) are available in the [full version](https://www.bluerock.io/try-bluerock).
 
 ## Test Runner
 

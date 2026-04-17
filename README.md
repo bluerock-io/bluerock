@@ -8,13 +8,15 @@
 
 ```bash
 pip install bluerock[oss]
+mkdir -p ~/.bluerock
+echo '{"enable": true, "mcp": true, "imports": true}' > ~/.bluerock/bluerock-oss.json
 python -m bluepython --oss --cfg-dir ~/.bluerock your_script.py
 cat ~/.bluerock/event-spool/python-*.ndjson | jq .event
 ```
 
 BlueRock wraps your Python process and emits structured NDJSON events for security-sensitive operations. It hooks into Python at startup, before your code runs, so nothing slips through. Your code, your dependencies, and their transitive dependencies are all in scope.
 
-Built for security teams, AppSec engineers, and anyone who wants to know what their Python applications are actually doing at runtime.
+Built for security teams, AppSec engineers, and AI developers deploying MCP agents. Know exactly what your tools call, which modules load, and what data crosses the wire, without changing a line of code. For anyone who wants to know what their Python applications are actually doing at runtime.
 
 | | BlueRock | Manual logging | OpenTelemetry |
 |---|---|---|---|
@@ -80,7 +82,7 @@ cat ~/.bluerock/event-spool/python-*.ndjson \
 Most runtime instrumentation focuses on observability (tracing API calls, measuring latency, collecting metrics). BlueRock focuses on **security**: the operations that matter from a threat-detection perspective.
 
 - **Zero code changes.** Wrap any script with `python -m bluepython --oss your_script.py`. No imports, no SDK integration required. A one-time [sensor config](#quick-start) enables the hooks you need.
-- **Three-layer hooking.** `sys.addaudithook` for process spawns and ctypes, `sys.meta_path` for every module import (with SHA256 verification), `wrapt` for framework-specific operations. Each layer catches what the others can't.
+- **Two-layer hooking.** `sys.meta_path` for every module import (with SHA256 verification), `wrapt` for MCP protocol monitoring. Additional hook layers (process spawns, ctypes, HTTP frameworks, LLM APIs) are available in the [full version](https://www.bluerock.io/try-bluerock).
 - **Full MCP coverage.** Tool calls, resource access, prompt requests, session lifecycle, and transport connections across stdio, HTTP, and SSE.
 - **Hooks before your code runs.** Instrumentation activates at Python startup. Operations from your code, your dependencies, and their transitive dependencies all emit events.
 - **Open source.** Apache 2.0. Inspect the hooks, contribute new ones, integrate with your own tooling.
@@ -89,8 +91,8 @@ Most runtime instrumentation focuses on observability (tracing API calls, measur
 
 BlueRock instruments your Python application at runtime using two mechanisms:
 
-- **`wrapt` monkey-patching** for imported libraries and frameworks. Hooks are applied lazily via `@wrapt.when_imported()`, so packages you don't use cost nothing.
-- **`sys.addaudithook`** for built-in security-sensitive operations (process spawning, ctypes loading, symlink creation).
+- **`wrapt` monkey-patching** for MCP protocol libraries. Hooks are applied lazily via `@wrapt.when_imported()`, so packages you don't use cost nothing.
+- **`sys.meta_path` import hooks** for supply-chain visibility. Every imported module is recorded with its SHA-256 hash, version, and file path.
 
 Every hooked operation emits a structured JSON event to an NDJSON log file at `~/.bluerock/event-spool/`. Events include full context: what was called, with what arguments, from which module, and the process ID.
 
@@ -98,13 +100,13 @@ Every hooked operation emits a structured JSON event to an NDJSON log file at `~
 ┌──────────────────────────────────────────────────────────────┐
 │  python -m bluepython --oss your_app.py                      │
 │                                                              │
-│  ┌──────────────┐    ┌──────────────┐    ┌────────────────┐  │
-│  │ audit hooks  │    │ import hooks │    │ framework hooks│  │
-│  │ (subprocess, │    │ (SHA256,     │    │ (MCP, LLMs,    │  │
-│  │  ctypes)     │    │  versions)   │    │  and more)     │  │
-│  └──────┬───────┘    └──────┬───────┘    └───────┬────────┘  │
-│         └───────────────┬───┘────────────────────┘           │
-│                         ▼                                    │
+│       ┌──────────────┐              ┌──────────────────┐     │
+│       │ import hooks │              │    MCP hooks     │     │
+│       │ (SHA256,     │              │ (tool calls,     │     │
+│       │  versions)   │              │  sessions, etc.) │     │
+│       └──────┬───────┘              └────────┬─────────┘     │
+│              └──────────────┬────────────────┘               │
+│                             ▼                                │
 │              ┌─────────────────┐                             │
 │              │ bluerock-oss    │  Rust DSO (libacoustic_oss) │
 │              │ NDJSON writer   │                             │
@@ -218,7 +220,7 @@ Or run an MCP server module:
 python -m bluepython --oss --cfg-dir ~/.bluerock your_mcp_server.py
 ```
 
-See [CONFIG.md](acoustic/python/CONFIG.md) for all sensor options. In this release, only **MCP** and **Imports** are active. The remaining options listed in CONFIG.md require the [full version](https://try.bluerock.io).
+See [CONFIG.md](acoustic/python/CONFIG.md) for all sensor options. In this release, only **MCP** and **Imports** are active. The remaining options listed in CONFIG.md require the [full version](https://www.bluerock.io/try-bluerock).
 
 Events are written to `~/.bluerock/event-spool/python-{pid}-{tid}.{generation}.ndjson`. Read them with `jq`:
 
@@ -229,8 +231,8 @@ cat ~/.bluerock/event-spool/python-*.ndjson | jq .event
 # Just imports
 cat ~/.bluerock/event-spool/python-*.ndjson | jq '.event | select(.meta.name == "python_import")'
 
-# Just process spawns
-cat ~/.bluerock/event-spool/python-*.ndjson | jq '.event | select(.meta.name | startswith("python_os_"))'
+# Just MCP events
+cat ~/.bluerock/event-spool/python-*.ndjson | jq '.event | select(.meta.name | startswith("python_mcp_"))'
 ```
 
 ### Example: NDJSON event trace
@@ -262,7 +264,6 @@ Options:
                        tip: auto-detected when bluerock-oss is installed if you forget.
   --cfg-dir DIR        Load sensor config from DIR/bluerock-oss.json (see CONFIG.md)
   -m MODULE            Run a Python module instead of a script
-  -p, --path-traversal Enable path traversal event detection
   --debug              Print debug logs to stderr
   --install            Install bluerock autostart (sitecustomize)
   --uninstall          Remove bluerock autostart
@@ -290,7 +291,7 @@ When imported, bluepython activates its hooks in the current process. Events are
 
 ### Persistent install (sitecustomize)
 
-> **Note:** Persistent install is designed for the [full version](https://try.bluerock.io). For OSS users, use the `python -m bluepython --oss` prefix or `import bluepython` in your code.
+> **Note:** Persistent install is designed for the [full version](https://www.bluerock.io/try-bluerock). For OSS users, use the `python -m bluepython --oss` prefix or `import bluepython` in your code.
 
 ## What Gets Monitored
 
@@ -307,7 +308,7 @@ Framework hooks use `@wrapt.when_imported()`. The hook module only loads when yo
 - Disabled feature = near-zero overhead (config gate)
 - Enabled + installed = full monitoring
 
-> **Want more?** BlueRock's sensor engine supports 30+ hook categories covering process spawns, dynamic code execution, serialization, HTTP frameworks, LLM APIs, and more. [Get in touch](https://try.bluerock.io) to enable the full suite.
+> **Want more?** BlueRock's sensor engine supports 30+ hook categories covering process spawns, dynamic code execution, serialization, HTTP frameworks, LLM APIs, and more. [Get in touch](https://www.bluerock.io/try-bluerock) to enable the full suite.
 
 ### MCP events in detail
 
@@ -339,7 +340,7 @@ This covers your code, your dependencies, AND their transitive dependencies. A s
 
 See the [import monitoring example](examples/core-hooks/import-monitoring/) for a runnable demo with `jq` queries.
 
-> **Note:** This release is monitoring-only. Policy enforcement and remediation (blocking tool calls, filtering resources) are available in the [full version](https://try.bluerock.io).
+> **Note:** This release is monitoring-only. Policy enforcement and remediation (blocking tool calls, filtering resources) are available in the [full version](https://www.bluerock.io/try-bluerock).
 
 ## Dashboard (Grafana + Loki)
 

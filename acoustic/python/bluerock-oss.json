@@ -1,4 +1,5 @@
 {
     "enable": true,
-    "mcp": true
+    "mcp": true,
+    "imports": true
 }

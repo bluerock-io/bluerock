@@ -1,0 +1,36 @@
+python:
+  - changed-files:
+      - any-glob-to-any-file: 'acoustic/python/**'
+
+rust:
+  - changed-files:
+      - any-glob-to-any-file: 'acoustic/python-oss/**'
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+          - '.ci_requirements/**'
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.md'
+          - 'examples/**'
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/Cargo.toml'
+          - '**/Cargo.lock'
+          - '**/pyproject.toml'
+          - '**/requirements*.txt'
+          - '**/requirements.lock'
+
+examples:
+  - changed-files:
+      - any-glob-to-any-file: 'examples/**'
+
+observe:
+  - changed-files:
+      - any-glob-to-any-file: 'observe/**'
