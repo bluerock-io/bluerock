@@ -2,6 +2,6 @@
 # (auditwheel on Linux, delocate on macOS, delvewheel on Windows) and runs the
 # Rust DSO build inside its own container — setuptools-rust lives in build-cibw.txt
 # for that container, not here on the host.
-build==1.4.2
+build==1.4.3
 setuptools-scm==10.0.5
 cibuildwheel==3.4.1
