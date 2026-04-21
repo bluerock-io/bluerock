@@ -4,7 +4,7 @@ The `SensorConfig` class (in `cfg.py`) controls which instrumentation hooks are 
 
 Options can be set as a boolean (`true`/`false`) or as an object with an `enable` key plus option-specific sub-fields (e.g., `{"enable": true, "log_prompts": false}`).
 
-## MCP Quick Start (v0.0.1)
+## MCP Quick Start (v0.1.0)
 
 For MCP-only monitoring, use this minimal config:
 
@@ -21,7 +21,7 @@ The `mcp` option instruments the `mcp` and `fastmcp` Python packages, capturing 
 
 > **Note:** This release is monitoring-only. Policy enforcement and remediation are available in the [full version](https://www.bluerock.io/try-bluerock).
 
-## OSS Config Options (v0.0.1)
+## OSS Config Options (v0.1.0)
 
 These options are available in the open-source release:
 

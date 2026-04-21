@@ -193,6 +193,26 @@ python -m bluepython --help
 
 Both install methods produce the same result: a working `bluerock` + `bluerock-oss` installation. The sensor discovers the DSO automatically via the installed `bluerock_oss` Python package.
 
+## Uninstall
+
+A clean removal is two commands. The pip-installed packages and the persistent-install files live in different places, so pip alone doesn't clean everything and the installer alone doesn't remove the packages.
+
+```bash
+# 1. Remove persistent hook files (bluepython.pth, sitecustomize block, sensor cfg)
+python -m bluepython.installer uninstall
+
+# 2. Remove the pip-installed packages
+pip uninstall -y bluerock-oss bluerock
+```
+
+Step 1 is a safe no-op if you never ran `python -m bluepython.installer install` — there is nothing to clean.
+
+User data under `~/.bluerock/` (sensor config, event spool) is intentionally left in place by both steps. Remove it manually if you want a full wipe:
+
+```bash
+rm -rf ~/.bluerock
+```
+
 ## Quick Start
 
 Create a sensor config to enable the hooks you need:
@@ -246,12 +266,12 @@ Running an MCP server produces events like these (one JSON object per line, wrap
 // MCP server initialized
 {"ts":"2026-04-02T10:00:00Z","event":{"context":{"process":{"pid":24241}},
  "meta":{"name":"python_mcp_server_init","origin":"bluepython","sensor_id":1,"type":"event"},
- "server":{"name":"test-mcp-server","version":"0.0.1"},"entity_id":"..."}}
+ "server":{"name":"test-mcp-server","version":"0.0.1"}}}
 
 // tool registered on the server
 {"ts":"2026-04-02T10:00:00Z","event":{"context":{"process":{"pid":24241}},
  "meta":{"name":"python_mcp_server_add","origin":"bluepython","sensor_id":1,"type":"event"},
- "element":{"type":"tool","name":"add","description":"Add two numbers."},"entity_id":"..."}}
+ "element":{"type":"tool","name":"add","description":"Add two numbers."}}}
 ```
 
 ## CLI Reference
@@ -411,8 +431,7 @@ Every line in the NDJSON log is a timestamped envelope wrapping an event:
       "name": "add",
       "description": "Add two numbers.",
       "parameters": { "a": "integer", "b": "integer" }
-    },
-    "entity_id": "550e8400-e29b-41d4-a716-446655440000"
+    }
   }
 }
 ```
@@ -420,7 +439,7 @@ Every line in the NDJSON log is a timestamped envelope wrapping an event:
 Use `jq .event` to unwrap the envelope when reading events.
 
 - `event.meta.name` — event type (see tables above)
-- `event.meta.type` — `"event"` (actionable) or `"sensor_lifecycle"` (informational)
+- `event.meta.type` — `"event"` (actionable), `"nonactionable"` (telemetry), or `"sensor_lifecycle"` (informational)
 - `event.meta.source_event_id` — monotonically increasing per-process counter
 - `event.context.process.pid` — process ID
 - Remaining fields are event-specific (see [EVENTS.md](acoustic/python/EVENTS.md))

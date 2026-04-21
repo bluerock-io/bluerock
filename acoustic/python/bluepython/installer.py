@@ -193,6 +193,10 @@ def _uninstall_pth():
 
 
 def _uninstall_sitecustomize():
+    # SITECUSTOMIZE_PATH may not exist on this host (non-Debian distros,
+    # or when install used the default .pth method). Nothing to clean.
+    if not Path(SITECUSTOMIZE_PATH).exists():
+        return
     data = ""
     with open(SITECUSTOMIZE_PATH, mode="r") as sitecustomize:
         data = sitecustomize.read()
@@ -215,7 +219,9 @@ def _uninstall_cfg():
 
     Path(cfg_path).unlink(missing_ok=True)
     cfg_dir = Path(os.path.dirname(cfg_path))
-    if not any(cfg_dir.iterdir()):
+    # cfg_dir may not exist when install was never run in this context
+    # (e.g. /etc/bru on a venv-only install).
+    if cfg_dir.exists() and not any(cfg_dir.iterdir()):
         cfg_dir.rmdir()
 
 

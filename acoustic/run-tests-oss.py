@@ -23,6 +23,7 @@ DEFAULT_EVENT_LOGDIR = os.path.join(os.getcwd(), "bluepython_test_logs")
 OSS_ALLOWLIST = {
     "test_import",
     "test_reload_import",
+    "test_mcp_tool",
 }
 
 
