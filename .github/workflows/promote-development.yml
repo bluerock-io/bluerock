@@ -4,11 +4,13 @@
 # GitLab staging builder).
 #
 # the staging builder (validate-oss-qa on GitLab) configures its
-# commits with `github-ci@bluerock.io` as committer. we skip those
-# here — they've already been promoted on gitlab's side. using the
-# committer email (rather than a trailer in the commit message)
-# prevents community contributors from spoofing the skip signal in
-# a PR body.
+# commits with a known service-account email as committer. we skip
+# those here — they've already been promoted on gitlab's side.
+# using the committer email (rather than a trailer in the commit
+# message) prevents community contributors from spoofing the skip
+# signal in a PR body. the email literal is kept out of this public
+# workflow source and read from the repo-level variable
+# CI_GIT_AUTHOR_EMAIL instead.
 name: Promote Development
 
 on:
@@ -28,12 +30,14 @@ permissions: {}
 jobs:
   promote:
     # skip commits produced by the gitlab staging builder. the staging
-    # builder sets committer.email = github-ci@bluerock.io before it
-    # runs commit-tree, so this is the authoritative signal. a community
-    # PR cannot forge this committer email on merge — github rewrites
-    # the committer for squash/rebase merges and for direct pushes the
-    # committer identity is set from the actor's verified identity.
-    if: "github.event.head_commit.committer.email != 'github-ci@bluerock.io'"
+    # builder sets committer.email to the service-account value before
+    # it runs commit-tree, so this is the authoritative signal. a
+    # community PR cannot forge this committer email on merge — github
+    # rewrites the committer for squash/rebase merges and for direct
+    # pushes the committer identity is set from the actor's verified
+    # identity. the canonical email value lives in the repo variable
+    # CI_GIT_AUTHOR_EMAIL so rotations don't require a code change.
+    if: "github.event.head_commit.committer.email != vars.CI_GIT_AUTHOR_EMAIL"
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:

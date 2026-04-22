@@ -70,8 +70,7 @@ Every line in the NDJSON log is a timestamped envelope wrapping an event. Use `j
       "type": "tool",
       "name": "add",
       "description": "Add two numbers."
-    },
-    "entity_id": "550e8400-e29b-41d4-a716-446655440000"
+    }
   }
 }
 ```

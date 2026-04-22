@@ -42,11 +42,3 @@ esac
 
 export CONFIG_FILE
 docker compose up --build -d "${EXTRA_ARGS[@]}"
-
-echo ""
-echo "Stack is running:"
-echo "  Grafana:  http://localhost:3000  (admin/admin)"
-echo "  Loki:     http://localhost:3100"
-echo ""
-echo "To view logs:  docker compose logs -f spoolfile2loki"
-echo "To stop:       ./deploy.sh down"

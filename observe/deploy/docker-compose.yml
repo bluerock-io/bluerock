@@ -1,6 +1,6 @@
 services:
   loki:
-    image: grafana/loki:3.5.0
+    image: grafana/loki:3.5.1
     volumes:
       - ./loki-config.yml:/etc/loki/local-config.yaml
       - loki-data:/loki
