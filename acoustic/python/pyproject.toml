@@ -52,6 +52,7 @@ oss = [
 ]
 test = [
     "aiohttp>=3.13.4",
+    "numpy>=1.26",
     "pyyaml>=6.0.2",
     "requests>=2.32",
 ]

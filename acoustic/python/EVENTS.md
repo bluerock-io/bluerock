@@ -40,7 +40,6 @@ Emitted when a FastMCP/MCPServer instance is created.
 | `server.description` | string | Server description, if provided |
 | `server.version` | string | Server version |
 | `server.instructions` | string | Server instructions, if provided |
-| `entity_id` | string | Component UUID for cross-process correlation |
 
 ### Event `python_mcp_server_add`
 
@@ -55,7 +54,6 @@ Emitted when a tool, resource, or prompt is registered on the server.
 | `element.parameters` | object | Parameter schema (tools only) |
 | `element.uri` | string | Resource URI (resources only) |
 | `element.arguments` | array | Prompt arguments (prompts only) |
-| `entity_id` | string | Component UUID |
 
 ### Event `python_mcp_event`
 
@@ -66,7 +64,6 @@ Emitted on every MCP protocol request, response, and notification. The `event` f
 | `event` | string | Sub-type (see table below) |
 | `id` | integer | MCP request ID |
 | `message` | object | Full JSON-RPC message body |
-| `entity_id` | string | Component UUID of the emitting process |
 | `client_id` | string | Client component UUID (server-side events) |
 | `session_id` | string | MCP session UUID |
 | `source` | integer | `0` = server, `1` = client |
@@ -89,21 +86,19 @@ Emitted on every MCP protocol request, response, and notification. The `event` f
 
 ### Event `python_mcp_session_created`
 
-Emitted when a client or server MCP session is initialized.
+Emitted when a client or server MCP session is initialized. Classified as `nonactionable` — pure lifecycle telemetry.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `entity_id` | string | Component UUID |
 | `session_id` | string | MCP session UUID |
 | `source` | integer | `0` = server session, `1` = client session |
 
 ### Event `python_mcp_session_terminated`
 
-Emitted when a client or server MCP session ends.
+Emitted when a client or server MCP session ends. Classified as `nonactionable` — pure lifecycle telemetry.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `entity_id` | string | Component UUID |
 | `client_id` | string | Client component UUID (server-side only) |
 | `session_id` | string | MCP session UUID |
 | `source` | integer | `0` = server session, `1` = client session |
@@ -119,7 +114,6 @@ Emitted when a client initiates a transport connection.
 | `server.args` | array | Command arguments (stdio only) |
 | `server.url` | string | Server URL (http/sse/websocket only) |
 | `server.auth` | boolean | Whether authentication is configured (http/sse only) |
-| `entity_id` | string | Component UUID |
 
 ---
 
