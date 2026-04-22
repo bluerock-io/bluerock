@@ -195,19 +195,22 @@ Both install methods produce the same result: a working `bluerock` + `bluerock-o
 
 ## Uninstall
 
-A clean removal is two commands. The pip-installed packages and the persistent-install files live in different places, so pip alone doesn't clean everything and the installer alone doesn't remove the packages.
+For the standard venv install (the recommended setup), uninstall is a single pip call:
 
 ```bash
-# 1. Remove persistent hook files (bluepython.pth, sitecustomize block, sensor cfg)
-python -m bluepython.installer uninstall
-
-# 2. Remove the pip-installed packages
 pip uninstall -y bluerock-oss bluerock
 ```
 
-Step 1 is a safe no-op if you never ran `python -m bluepython.installer install` — there is nothing to clean.
+### If you enabled persistent install
 
-User data under `~/.bluerock/` (sensor config, event spool) is intentionally left in place by both steps. Remove it manually if you want a full wipe:
+If you also ran `python -m bluepython.installer install --oss` to wire the sensor into Python interpreter startup (via a `.pth` file, plus an optional sitecustomize block), remove those first, then pip uninstall:
+
+```bash
+python -m bluepython.installer uninstall
+pip uninstall -y bluerock-oss bluerock
+```
+
+User data under `~/.bluerock/` (sensor config, event spool) is intentionally left in place by both flows. Remove it manually if you want a full wipe:
 
 ```bash
 rm -rf ~/.bluerock
