@@ -143,6 +143,18 @@ def check_sqlite_event(events):
     )
 
 
+def check_mcp_span_events(events):
+    if not check_for_event(events, "python_span_start", {"name": "mcp_server_message"}):
+        return False
+    if not check_for_event(events, "python_span_end", {"name": "mcp_server_message"}):
+        return False
+    for data in events:
+        if data["meta"]["name"] == "python_sdk_event" and data["meta"].get("span_id") is not None:
+            return True
+    print("no python_sdk_event with a span_id")
+    return False
+
+
 python_test_cases = [
     #### Pickle ####
     # Just check that the fuzzer doesn't crash
@@ -264,6 +276,19 @@ python_test_cases = [
         event_parser=lambda events: (
             check_for_event(events, "python_sdk_event", {"name": "test_event", "attrs": {"key": "value"}})
         ),
+    ),
+    PythonTestCase(
+        "test_span",
+        event_parser=lambda events: (
+            check_for_event(events, "python_span_start", {"name": "test-span"})
+            and check_for_event(events, "python_span_end", {"name": "test-span"})
+            and check_for_event(events, "python_sdk_event", {"name": "test_event"})
+        ),
+    ),
+    PythonTestCase(
+        "test_mcp_span",
+        extra_deps=["fastmcp"],
+        event_parser=check_mcp_span_events,
     ),
     PythonTestCase(
         "test_anthropic",

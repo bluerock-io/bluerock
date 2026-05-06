@@ -414,7 +414,7 @@ async def wrap_mcp_session_send_request_pre(fn, instance, args, kwargs):
         if request.root.params.meta is None:
             request.root.params.meta = types.RequestParams.Meta()
         # Pydantic will handle the aliasing to `_meta`.
-        request.root.params.meta.entity_id = backend.component_id
+        request.root.params.meta.entity_id = backend.acousticBackend.component_id
         request.root.params.meta.session_id = getattr(instance, "session_id", "null")
 
     # current request ID
@@ -548,6 +548,29 @@ def wrap_mcp_client_session_send_response(fn, instance, args, kwargs):
     )
 
 
+def wrap_mcp_server_handle_message(wrapped, instance, args, kwargs):
+    async def span_wrapper():
+        span = backend.new_span("mcp_server_message")
+        try:
+            return await wrapped(*args, **kwargs)
+        finally:
+            span.close()
+
+    return span_wrapper()
+
+
+def wrap_mcp_client_send_request(wrapped, instance, args, kwargs):
+    async def span_wrapper():
+        span = backend.new_span("mcp_client_request")
+        try:
+            # Delegate to another wrapper here.
+            return await wrap_mcp_session_send_request(wrapped, instance, args, kwargs)
+        finally:
+            span.close()
+
+    return span_wrapper()
+
+
 @wrapt.when_imported("mcp")
 def apply_mcp_hooks(mcp):
     wrapper.wrap_function_wrapper(
@@ -578,7 +601,7 @@ def apply_mcp_hooks(mcp):
     wrapper.wrap_function_wrapper("mcp.shared.session", "BaseSession.send_request", wrap_mcp_session_send_request)
     # Explicitly wrap ClientSession and ServerSession to ensure hooks apply
     # even if inheritance wrapping is flaky
-    wrapper.wrap_function_wrapper("mcp.client.session", "ClientSession.send_request", wrap_mcp_session_send_request)
+    wrapper.wrap_function_wrapper("mcp.client.session", "ClientSession.send_request", wrap_mcp_client_send_request)
     wrapper.wrap_function_wrapper("mcp.server.session", "ServerSession.send_request", wrap_mcp_session_send_request)
     wrapper.wrap_function_wrapper("mcp.client.sse", "sse_client", wrap_mcp_client_sse_client)
     wrapper.wrap_function_wrapper("mcp.client.stdio", "stdio_client", wrap_mcp_client_stdio_client)
@@ -593,6 +616,10 @@ def apply_mcp_hooks(mcp):
     )
     wrapper.wrap_function_wrapper("mcp.shared.session", "BaseSession.__init__", wrap_mcp_shared_session_init)
     wrapper.wrap_function_wrapper("mcp.client.session", "ClientSession.__aexit__", wrap_mcp_client_session_exit)
+    if importlib.util.find_spec("mcp.server.lowlevel"):
+        wrapper.wrap_function_wrapper(
+            "mcp.server.lowlevel.server", "Server._handle_message", wrap_mcp_server_handle_message
+        )
 
 
 @wrapt.when_imported("mcp.client.websocket")

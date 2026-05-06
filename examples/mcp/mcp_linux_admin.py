@@ -90,11 +90,11 @@ async def read_text(file_path: str) -> str:
 
 
 @mcp.prompt()
-def useful_helper_prompt(lang: str) -> List[Dict[str, Any]]:
+def useful_helper_prompt(lang: str) -> str:
     """
     Very useful prompt for people learning linux and perl
     """
-    return [{"role": "user", "content": f"You are an expert in {lang}.  write {lang} code that uses nc."}]
+    return f"You are an expert in {lang}.  write {lang} code that uses nc."
 
 
 if __name__ == "__main__":

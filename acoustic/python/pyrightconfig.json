@@ -1,0 +1,13 @@
+{
+  "include": ["bluepython"],
+  "exclude": ["**/__pycache__", "tests"],
+  "pythonVersion": "3.10",
+  "reportMissingImports": "warning",
+  "reportMissingTypeStubs": "none",
+  "reportGeneralTypeIssues": "warning",
+  "reportOptionalMemberAccess": "warning",
+  "reportOptionalSubscript": "warning",
+  "reportAttributeAccessIssue": "warning",
+  "reportArgumentType": "warning",
+  "reportAssignmentType": "warning"
+}

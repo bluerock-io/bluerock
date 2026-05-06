@@ -12,6 +12,14 @@ on:
 permissions:
   contents: read
 
+# cancel earlier runs on the same branch/PR — saves CI minutes when a
+# contributor pushes follow-up commits. main/development push events
+# (and the weekly schedule) still serialize via the same group, but
+# don't cancel — those runs are load-bearing for the staging mirror.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   PYTHON_VERSION: '3.12'
 
@@ -44,12 +52,36 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: pip install -r .github/requirements/lint.txt
-      - run: black --check --config acoustic/python/pyproject.toml acoustic/python/
-      - run: ruff check acoustic/python/
+      # black + ruff run via pre-commit hooks (.pre-commit-config.yaml).
+      # devs can mirror locally with `pre-commit install`.
+      - run: pre-commit run --all-files
       - name: Verify dependency lock file
         # the lockfile is always expected on the default branch; a
         # missing file should fail the check, not skip it.
         run: bash .github/scripts/lock-deps.sh --verify
+
+  # static type-check via pyright. advisory at first run (continue-on-error)
+  # so legacy issues don't gate ci; flip to `false` once the baseline is
+  # clean. config: acoustic/python/pyrightconfig.json.
+  type-check-python:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      # install runtime + test + mcp extras so pyright resolves all imports
+      # the bluepython hooks reach into (pydantic, mcp, fastmcp, wrapt, etc.).
+      - run: pip install -e "acoustic/python/[test,mcp]"
+      - name: Run pyright
+        working-directory: acoustic/python
+        run: |
+          pip install pyright==1.1.385
+          pyright
 
   build-test-unified:
     timeout-minutes: 30

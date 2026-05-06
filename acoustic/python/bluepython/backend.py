@@ -1,6 +1,7 @@
 # Copyright (C) 2025 BlueRock Security, Inc.
 # All rights reserved.
 
+import contextvars
 import copy
 import ctypes
 import json
@@ -11,22 +12,11 @@ import sys
 import time
 import threading
 import traceback
-from pathlib import Path
 import uuid
+from pathlib import Path
 from . import cfg
 
 FORK_SAFE = True
-
-
-# Either get the component ID from BRace or generate a new one.
-def get_component_id():
-    env = os.environ.get("BRU_COMPONENT_ID")
-    if env:
-        return uuid.UUID(env)
-    return uuid.uuid4()
-
-
-component_id = str(get_component_id())
 
 
 # Yields incrementing integers in a thread-safe way.
@@ -42,6 +32,8 @@ def atomic_range():
 
 
 source_event_id_iter = atomic_range()
+
+_current_span = contextvars.ContextVar("_current_span", default=None)
 
 
 # Exception that is raised when a "block" remediation happens.
@@ -67,7 +59,7 @@ def compose_event(name, attrs=None, *, actionable=True):
             "origin": "bluepython",
             "sensor_id": acousticBackend.sensor_id,
             "source_event_id": next(source_event_id_iter),
-            "uuid": component_id,
+            "component_id": acousticBackend.component_id,
         },
         "context": {
             "process": {
@@ -80,6 +72,9 @@ def compose_event(name, attrs=None, *, actionable=True):
             "name": platform.python_implementation(),
             "version": platform.python_version(),
         }
+    span = _current_span.get()
+    if span is not None:
+        evt["meta"]["span_id"] = span.span_id
     if attrs is not None:
         evt.update(attrs)
     return evt
@@ -129,6 +124,8 @@ class AcousticLib:
         "_acoustic_last_error_msg",
         "_acoustic_last_sensor_config",
         "_acoustic_last_modification",
+        "_acoustic_get_runtime_info",
+        "_acoustic_last_runtime_info",
     )
 
     def __init__(self, *, oss):
@@ -194,6 +191,14 @@ class AcousticLib:
         self._acoustic_last_modification = cdll["acoustic_last_modification"]
         self._acoustic_last_modification.argtypes = [ctypes.POINTER(ctypes.c_char_p)]
         self._acoustic_last_modification.restype = None
+
+        self._acoustic_get_runtime_info = cdll["acoustic_get_runtime_info"]
+        self._acoustic_get_runtime_info.argtypes = []
+        self._acoustic_get_runtime_info.restype = ctypes.c_int
+
+        self._acoustic_last_runtime_info = cdll["acoustic_last_runtime_info"]
+        self._acoustic_last_runtime_info.argtypes = [ctypes.POINTER(ctypes.c_char_p)]
+        self._acoustic_last_runtime_info.restype = None
 
     def tracing_stderr(self):
         res = self._acoustic_tracing_stderr()
@@ -309,6 +314,13 @@ class AcousticLib:
             raise RuntimeError(f"Failed to obtain sensor config from libacoustic (code {res}): {msg}")
         return json.loads(self._last_sensor_config())
 
+    def get_runtime_info(self):
+        res = self._acoustic_get_runtime_info()
+        if res:
+            msg = self._last_error_msg()
+            raise RuntimeError(f"Failed to obtain runtime info from libacoustic (code {res}): {msg}")
+        return json.loads(self._last_runtime_info())
+
     def _last_error_msg(self):
         ptr = ctypes.c_char_p()
         self._acoustic_last_error_msg(ctypes.byref(ptr))
@@ -323,6 +335,13 @@ class AcousticLib:
             return None
         return ctypes.string_at(ptr).decode("utf8")
 
+    def _last_runtime_info(self):
+        ptr = ctypes.c_char_p()
+        self._acoustic_last_runtime_info(ctypes.byref(ptr))
+        if not ptr:
+            return None
+        return ctypes.string_at(ptr).decode("utf8")
+
     def _last_modification(self):
         ptr = ctypes.c_char_p()
         self._acoustic_last_modification(ctypes.byref(ptr))
@@ -332,11 +351,13 @@ class AcousticLib:
 
 
 class AcousticBackend:
-    __slots__ = ("_lib", "_thread", "sensor_id")
+    __slots__ = ("_lib", "_thread", "sensor_id", "component_id")
 
     def __init__(self):
         self._lib = AcousticLib(oss=cfg.config.oss)
         self._lib.init()
+
+        self.component_id = self._lib.get_runtime_info()["component_id"]
 
         self.sensor_id = self._lib.get_sensor_id()
 
@@ -398,7 +419,7 @@ class AcousticBackend:
                 "origin": "bluepython",
                 "sensor_id": self.sensor_id,
                 "source_event_id": 0,
-                "uuid": component_id,
+                "component_id": self.component_id,
             },
             "pid": os.getpid(),
             "file_path": sys.argv[0],
@@ -567,3 +588,21 @@ def exception(e):
     tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
     error("Exception in instrumentation:\n" + tb)
     emit_event("internal_exception", {"type": repr(type(e))})
+
+
+class Span:
+    __slots__ = ("name", "span_id", "_token")
+
+    def __init__(self, name):
+        self.name = name
+        self.span_id = uuid.uuid4().hex
+        self._token = _current_span.set(self)
+        emit_event("span_start", {"name": self.name, "own_span_id": self.span_id})
+
+    def close(self):
+        emit_event("span_end", {"name": self.name, "own_span_id": self.span_id})
+        _current_span.reset(self._token)
+
+
+def new_span(name):
+    return Span(name)

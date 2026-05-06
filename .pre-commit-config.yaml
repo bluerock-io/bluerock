@@ -1,0 +1,19 @@
+# pre-commit hooks for bluerock oss.
+# install: pip install pre-commit && pre-commit install
+# manual run: pre-commit run --all-files
+#
+# pinned tags mirror .github/requirements/lint.txt; bump quarterly
+# via `pre-commit autoupdate` and keep both in sync.
+repos:
+  - repo: https://github.com/psf/black
+    rev: 26.3.1
+    hooks:
+      - id: black
+        files: ^acoustic/python/
+        args: [--config=acoustic/python/pyproject.toml]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.10
+    hooks:
+      - id: ruff
+        files: ^acoustic/python/

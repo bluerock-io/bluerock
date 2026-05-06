@@ -2,6 +2,7 @@
 # All rights reserved.
 
 from .. import backend
+from ..backend import new_span as new_span
 
 
 def event(name, attrs=None):

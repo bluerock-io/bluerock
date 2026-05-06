@@ -43,6 +43,22 @@ impl AcousticStatus {
 }
 
 static SENSOR_CONFIG: OnceLock<serde_json::Value> = OnceLock::new();
+static COMPONENT_ID: OnceLock<String> = OnceLock::new();
+
+fn component_id() -> &'static str {
+    COMPONENT_ID.get_or_init(|| {
+        if let Ok(v) = std::env::var("BRU_COMPONENT_ID")
+            && !v.is_empty()
+        {
+            return v;
+        }
+        let policy = std::env::var("ACOUSTIC_POLICY_HINT")
+            .ok()
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| "default".to_owned());
+        format!("{policy}/{}", uuid::Uuid::new_v4())
+    })
+}
 
 fn load_sensor_config(metadata_ptr: *const c_char) {
     let config = (|| -> Option<serde_json::Value> {
@@ -69,11 +85,16 @@ enum Context {
     Config(CString),
     #[allow(dead_code)]
     Modification(CString),
+    RuntimeInfo(CString),
 }
 
 impl Context {
     fn config(v: serde_json::Value) -> Self {
         Context::Config(CString::new(v.to_string()).unwrap())
+    }
+
+    fn runtime_info(v: serde_json::Value) -> Self {
+        Context::RuntimeInfo(CString::new(v.to_string()).unwrap())
     }
 }
 
@@ -343,6 +364,35 @@ pub unsafe extern "C" fn acoustic_get_sensor_config() -> c_int {
         let config = SENSOR_CONFIG.get().ok_or(Error::Uninitialized)?;
         Ok(Context::config(config.clone()))
     }) as c_int
+}
+
+/// Retrieves runtime info (currently: component_id) and stores it into context.
+///
+/// # Safety
+/// No pointer arguments. Always safe to call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn acoustic_get_runtime_info() -> c_int {
+    stash_return_value_into_context(|| {
+        let json = serde_json::json!({
+            "component_id": component_id(),
+        });
+        Ok(Context::runtime_info(json))
+    }) as c_int
+}
+
+/// Returns the last retrieved runtime info.
+///
+/// # Safety
+/// `out_ptr` must be a valid pointer to a writable `*const c_char`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn acoustic_last_runtime_info(out_ptr: *mut *const c_char) {
+    CONTEXT.with(|ctx| {
+        let ptr = match &*ctx.borrow() {
+            Context::RuntimeInfo(info) => info.as_ptr(),
+            _ => std::ptr::null(),
+        };
+        unsafe { out_ptr.write(ptr) };
+    });
 }
 
 /// Returns the error message that was encountered by the last libacoustic function.

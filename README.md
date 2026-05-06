@@ -1,10 +1,10 @@
-# BlueRock
+# BlueRock MCP Python Hooks
 
 [![PyPI](https://img.shields.io/pypi/v/bluerock)](https://pypi.org/project/bluerock/)
 [![Python](https://img.shields.io/pypi/pyversions/bluerock)](https://pypi.org/project/bluerock/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
-**Lightweight runtime security sensor for Python.** Monitor MCP tool calls, resource access, session lifecycle, and module imports your application makes, with zero code changes, emitting structured events for every operation.
+**Lightweight runtime security sensor for Python MCP servers.** Monitor MCP tool calls, resource access, session lifecycle, and module imports your application makes, with zero code changes, emitting structured events for every operation.
 
 ```bash
 pip install bluerock[oss]

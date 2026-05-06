@@ -1,6 +1,6 @@
-# BlueRock
+# BlueRock MCP Python Hooks
 
-Runtime security sensor for Python applications. Monitors MCP protocol interactions and module imports — emitting structured NDJSON events for every operation, with zero code changes.
+Lightweight runtime security sensor for Python MCP servers. Monitors MCP protocol interactions and module imports — emitting structured NDJSON events for every operation, with zero code changes.
 
 ## Install
 
