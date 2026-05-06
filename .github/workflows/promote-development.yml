@@ -1,16 +1,15 @@
 # auto-promote development → main after CI passes on development.
 # this is the path that handles dependabot merges and community PRs
 # that land directly on development (i.e. without going through the
-# GitLab staging builder).
+# upstream staging builder).
 #
-# the staging builder (validate-oss-qa on GitLab) configures its
-# commits with a known service-account email as committer. we skip
-# those here — they've already been promoted on gitlab's side.
-# using the committer email (rather than a trailer in the commit
-# message) prevents community contributors from spoofing the skip
-# signal in a PR body. the email literal is kept out of this public
-# workflow source and read from the repo-level variable
-# CI_GIT_AUTHOR_EMAIL instead.
+# the upstream staging builder configures its commits with a known
+# service-account email as committer. we skip those here — they've
+# already been promoted upstream. using the committer email (rather
+# than a trailer in the commit message) prevents community contributors
+# from spoofing the skip signal in a PR body. the email literal is
+# kept out of this workflow source and read from the repo-level
+# variable CI_GIT_AUTHOR_EMAIL instead.
 name: Promote Development
 
 on:
@@ -29,7 +28,7 @@ permissions: {}
 
 jobs:
   promote:
-    # skip commits produced by the gitlab staging builder. the staging
+    # skip commits produced by the upstream staging builder. the staging
     # builder sets committer.email to the service-account value before
     # it runs commit-tree, so this is the authoritative signal. a
     # community PR cannot forge this committer email on merge — github
@@ -54,7 +53,7 @@ jobs:
           COMMIT_SHA: ${{ github.sha }}
           REPO: ${{ github.repository }}
         # reuse the shared poll-github-ci.sh so tracked-workflow names
-        # and expected counts stay in sync with the gitlab-side checks.
+        # and expected counts stay in sync with the upstream checks.
         # a previous inline implementation here drifted from the shared
         # script and skipped newly-added required workflows.
         run: |

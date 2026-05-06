@@ -355,9 +355,12 @@ Every `import` statement produces a `python_import` event:
 | Field | What you see |
 |-------|-------------|
 | `fullname` | Fully-qualified module name (e.g., `urllib3.util.retry`) |
-| `sha256` | SHA-256 hash of the module file on disk — detects tampering between runs |
+| `path` | Lookup path passed to the import system |
+| `file` | Absolute filesystem path to the resolved module |
+| `pkg` | Top-level package name (e.g., `urllib3`) |
 | `version` | Installed package version from metadata (when available) |
-| `path` | Absolute filesystem path to the module |
+| `sha256` | SHA-256 hash of the module file on disk — detects tampering between runs |
+| `hash_changed` | `true` when SHA-256 differs from the last-seen hash for this module |
 
 This covers your code, your dependencies, AND their transitive dependencies. A single `import requests` generates events for `requests`, `urllib3`, `charset_normalizer`, `certifi`, and more — each with its own SHA-256 fingerprint.
 

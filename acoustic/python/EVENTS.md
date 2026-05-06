@@ -1,4 +1,4 @@
-# BlueRock MCP Event Reference
+# BlueRock Python Event Reference
 
 All events are written as NDJSON to `~/.bluerock/event-spool/python-{pid}-{tid}.{generation}.ndjson`. Each line is a timestamped envelope:
 
@@ -114,6 +114,26 @@ Emitted when a client initiates a transport connection.
 | `server.args` | array | Command arguments (stdio only) |
 | `server.url` | string | Server URL (http/sse/websocket only) |
 | `server.auth` | boolean | Whether authentication is configured (http/sse only) |
+
+---
+
+## Import Events
+
+### Event `python_import`
+
+Emitted for every module import. The hook installs as a `sys.meta_path` finder, so it fires for your code, your dependencies, and their transitive dependencies — including stdlib modules.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `fullname` | string | Fully-qualified module name (e.g., `urllib3.util.retry`) |
+| `path` | string | Lookup path passed to the import system, or `null` for top-level imports |
+| `file` | string | Absolute filesystem path to the resolved module file, or `null` if not on disk |
+| `pkg` | string | Top-level package name (e.g., `urllib3`) |
+| `version` | string | Installed package version from metadata, when available |
+| `sha256` | string | SHA-256 hash of the module file — useful for tamper detection between runs |
+| `hash_changed` | boolean | `true` if `sha256` differs from the previously-seen hash for this module across runs |
+
+A single `import requests` produces events for `requests`, `urllib3`, `charset_normalizer`, `certifi`, and their dependencies — each with its own SHA-256 fingerprint.
 
 ---
 

@@ -35,7 +35,7 @@ cat ~/.bluerock/event-spool/python-*.ndjson | jq .event
 
 | Category | Events |
 |----------|--------|
-| **Imports** | `python_import` — name, path, version, SHA256 |
+| **Imports** | `python_import` — name, path, file, package, version, SHA256, change detection |
 
 ### Framework hooks (zero overhead if not imported)
 
