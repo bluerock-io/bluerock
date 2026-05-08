@@ -493,6 +493,12 @@ observe/
   release.yml          # Tag-driven: build -> test -> PyPI (OIDC)
 ```
 
+## Resources
+
+- **Launch announcement** — [Introducing MCP Python Hooks](https://www.bluerock.io/post/introducing-mcp-python-hooks): the motivation, the design, and where this fits in agent runtime visibility.
+- **Developer hub** — [bluerock.io/developer-hub/mcp-python-hooks](https://www.bluerock.io/developer-hub/mcp-python-hooks): quickstart, recipes, and how the OSS sensor connects to the broader BlueRock platform.
+- **BlueRock** — [bluerock.io](https://www.bluerock.io): observability and guardrails for the full agent action path.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, code standards, and how to submit changes.
