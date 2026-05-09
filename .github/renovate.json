@@ -1,0 +1,20 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "enabledManagers": ["gomod"],
+  "schedule": ["before 6am on monday"],
+  "packageRules": [
+    {
+      "matchManagers": ["gomod"],
+      "matchDepNames": ["go"],
+      "matchDepTypes": ["golang"],
+      "rangeStrategy": "bump",
+      "labels": ["dependencies", "go-directive"]
+    },
+    {
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["require"],
+      "enabled": false
+    }
+  ]
+}

@@ -86,6 +86,7 @@ jobs:
     continue-on-error: true
     permissions:
       contents: read
+      issues: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
@@ -103,7 +104,47 @@ jobs:
           # compatible x/tools. bump again if go.mod's toolchain moves
           # past what this govulncheck release supports.
           go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
-          govulncheck ./...
+          govulncheck ./... 2>&1 | tee /tmp/govulncheck.txt
+
+      - name: Suggest stdlib version bump
+        if: failure() && github.event_name == 'schedule'
+        run: |
+          # extract the highest "Fixed in: stdlib@goX.Y.Z" version from
+          # govulncheck output so the issue body names the bump target.
+          highest=$(grep -oE 'Fixed in: stdlib@go[0-9]+\.[0-9]+\.[0-9]+' /tmp/govulncheck.txt \
+            | sed 's/.*go//' \
+            | sort -V | tail -1)
+          if [ -n "$highest" ]; then
+            echo "RECOMMENDED_GO_VERSION=$highest" >> "$GITHUB_ENV"
+          fi
+
+      - name: Generate failure report
+        if: failure() && github.event_name == 'schedule'
+        run: |
+          {
+            echo "## Security audit failure (Go advisories)"
+            echo
+            echo "The weekly security audit found Go advisories reachable from app code."
+            echo
+            echo "**CI run:** ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/$GITHUB_RUN_ID"
+            echo "**Job:** go-advisories"
+            if [ -n "${RECOMMENDED_GO_VERSION:-}" ]; then
+              echo
+              echo "**Suggested fix:** bump the \`go\` directive in \`observe/spoolfile2loki/go.mod\` to \`${RECOMMENDED_GO_VERSION}\` or later."
+            fi
+          } > /tmp/audit-failure.md
+
+      - name: Create issue on failure
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create security --color D93F0B --description "Security issue" 2>/dev/null || true
+          gh label create ci --color 0E8A16 --description "CI/build issue" 2>/dev/null || true
+          gh issue create \
+            --title "[CI] Security audit failure: Go advisories" \
+            --body-file /tmp/audit-failure.md \
+            --label security --label ci
 
   # fail the build if any .go file isn't gofmt-clean. this catches
   # drift early so PRs don't land with formatting noise that makes
