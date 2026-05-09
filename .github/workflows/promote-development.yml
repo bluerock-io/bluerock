@@ -41,6 +41,7 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: write
+      pull-requests: write
       actions: read
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -70,49 +71,38 @@ jobs:
         run: |
           set -eo pipefail
 
+          # confirm the token can authenticate before any push.
+          if ! gh api user --jq '"authenticated as: \(.login)"'; then
+            echo "::error::token authentication failed; rotate PROMOTE_TOKEN and re-run."
+            exit 1
+          fi
+
           PUSH_URL="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
 
-          # primary: fast-forward push for clean linear history.
+          # try a fast-forward push.
           if git push "$PUSH_URL" "${COMMIT_SHA}:refs/heads/main" 2>/dev/null; then
             echo "Promoted: main now at $COMMIT_SHA (fast-forward)"
             exit 0
           fi
 
-          # fallback: merges API handles divergence, auth edge cases,
-          # and non-ff rejections without error-string parsing.
-          # retry up to 3x — covers transient 5xx from the API.
-          echo "fast-forward push failed; falling back to merges API..."
-          MERGE_SHA=""
-          for DELAY in 5 10 20; do
-            if MERGE_RESP=$(gh api -X POST "repos/${REPO}/merges" \
-              -f base=main \
-              -f head="$COMMIT_SHA" \
-              -f commit_message="Merge development into main ($(printf '%s' "$COMMIT_SHA" | cut -c1-10))" \
-              2>/tmp/merge-err); then
-              if [ -n "$MERGE_RESP" ]; then
-                MERGE_SHA=$(printf '%s' "$MERGE_RESP" | jq -r '.sha // empty')
-              fi
-              break
-            fi
-            echo "merges API attempt failed; retrying in ${DELAY}s..."
-            sleep "$DELAY"
-          done
-
-          if [ -n "$MERGE_SHA" ]; then
-            echo "Promoted: main now at $MERGE_SHA (merge commit)"
-          elif [ -z "$(cat /tmp/merge-err 2>/dev/null)" ]; then
-            echo "Already up to date: main already contains $COMMIT_SHA"
-          else
-            echo "::error::merges API failed after retries."
-            echo "likely causes:"
-            echo "  - merge conflict needing manual resolution"
-            echo "  - PROMOTE_TOKEN lacks write access to $REPO"
-            echo "  - branch protection requires checks not present on this sha"
-            echo ""
-            echo "manual recovery:"
-            echo "  gh api -X POST repos/${REPO}/merges \\"
-            echo "    -f base=main -f head=${COMMIT_SHA} \\"
-            echo "    -f commit_message='merge dev into main (manual)'"
-            cat /tmp/merge-err
+          # fallback: open a pr from development to main and squash-merge it.
+          # github's squash-merge produces a single web-flow-signed commit on
+          # main, satisfying both linear-history and signed-commits rules.
+          echo "fast-forward not possible; opening pr for squash-merge..."
+          DEV_SHORT=$(printf '%s' "$COMMIT_SHA" | cut -c1-10)
+          PR_URL=$(gh pr create \
+            --base main --head development \
+            --title "Promote development → main ($DEV_SHORT)" \
+            --body "Auto-promote after CI green on development." \
+            --label automation 2>/dev/null \
+            || gh pr list --base main --head development --state open --json url --jq '.[0].url')
+          if [ -z "$PR_URL" ]; then
+            echo "::error::could not create or find a pr from development to main."
             exit 1
           fi
+          PR_NUM=$(printf '%s' "$PR_URL" | grep -oE '[0-9]+$')
+          if ! gh pr merge "$PR_NUM" --squash --admin --delete-branch=false; then
+            echo "::error::squash-merge of pr #$PR_NUM failed."
+            exit 1
+          fi
+          echo "Promoted: main advanced via pr #$PR_NUM (squash)"
