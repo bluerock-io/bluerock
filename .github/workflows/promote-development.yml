@@ -48,7 +48,29 @@ jobs:
         with:
           persist-credentials: false
 
+      # short-circuit when development already equals main. the post-promote
+      # resync below force-pushes development back to main, which itself
+      # fires this workflow again; without this guard that follow-on run
+      # would sit through a full CI poll only to no-op. comparing branch
+      # tips lets it exit in seconds instead.
+      - name: Check whether development already equals main
+        id: sync_check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -eo pipefail
+          DEV=$(gh api "repos/$REPO/branches/development" --jq '.commit.sha')
+          MAIN=$(gh api "repos/$REPO/branches/main" --jq '.commit.sha')
+          if [ "$DEV" = "$MAIN" ]; then
+            echo "development already at main ($MAIN); nothing to promote."
+            echo "in_sync=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "in_sync=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Wait for CI checks on development
+        if: steps.sync_check.outputs.in_sync != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           COMMIT_SHA: ${{ github.sha }}
@@ -64,6 +86,7 @@ jobs:
             --sha "$COMMIT_SHA"
 
       - name: Promote development → main
+        if: steps.sync_check.outputs.in_sync != 'true'
         env:
           GH_TOKEN: ${{ secrets.PROMOTE_TOKEN }}
           COMMIT_SHA: ${{ github.sha }}
@@ -106,3 +129,24 @@ jobs:
             exit 1
           fi
           echo "Promoted: main advanced via pr #$PR_NUM (squash)"
+
+          # re-sync development onto the freshly promoted main. a squash-merge
+          # writes a new commit on main with no parent link back to development,
+          # so the two branches drift after every promote; the next dependabot
+          # bump that touches the same lines then fails to squash-merge because
+          # git treats main's squash and development's originals as conflicting
+          # concurrent edits. resetting development to main restores shared
+          # ancestry so future promotes stay clean.
+          #
+          # --force-with-lease only overwrites development if it is still at the
+          # commit this run promoted — if a dependabot PR raced in afterward the
+          # lease fails and we leave it for the queued promote. resync is
+          # best-effort: a failure must not fail an otherwise successful promote.
+          git fetch "$PUSH_URL" main
+          NEW_MAIN=$(git rev-parse FETCH_HEAD)
+          if git push --force-with-lease=refs/heads/development:"$COMMIT_SHA" \
+               "$PUSH_URL" "${NEW_MAIN}:refs/heads/development" 2>/dev/null; then
+            echo "Re-synced development → main ($NEW_MAIN)"
+          else
+            echo "::warning::could not resync development to main (branch protection, missing bypass, or a raced merge). resync manually with: git push --force-with-lease origin main:development"
+          fi
