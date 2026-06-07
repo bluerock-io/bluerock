@@ -10,7 +10,7 @@
 pip install bluerock[oss]
 mkdir -p ~/.bluerock
 echo '{"enable": true, "mcp": true, "imports": true}' > ~/.bluerock/bluerock-oss.json
-python -m bluepython --oss --cfg-dir ~/.bluerock your_script.py
+python -m bluerock --oss --cfg-dir ~/.bluerock your_script.py
 cat ~/.bluerock/event-spool/python-*.ndjson | jq .event
 ```
 
@@ -54,7 +54,7 @@ echo '{"enable": true, "mcp": true}' > ~/.bluerock/bluerock-oss.json
 
 # 4. Run the MCP example (client launches a server, both are monitored)
 cd examples/mcp/
-python -m bluepython --oss mcp_client.py --transport stdio
+python -m bluerock --oss mcp_client.py --transport stdio
 
 # 5. See what happened
 cat ~/.bluerock/event-spool/python-*.ndjson | jq '.event.meta.name' | sort | uniq -c | sort -rn
@@ -70,7 +70,7 @@ echo '{"enable": true, "mcp": true, "imports": true}' > ~/.bluerock/bluerock-oss
 
 # Run the import monitoring example
 pip install requests
-python -m bluepython --oss examples/core-hooks/import-monitoring/import_monitoring.py
+python -m bluerock --oss examples/core-hooks/import-monitoring/import_monitoring.py
 
 # See every module loaded, with SHA-256 hashes
 cat ~/.bluerock/event-spool/python-*.ndjson \
@@ -81,7 +81,7 @@ cat ~/.bluerock/event-spool/python-*.ndjson \
 
 Most runtime instrumentation focuses on observability (tracing API calls, measuring latency, collecting metrics). BlueRock focuses on **security**: the operations that matter from a threat-detection perspective.
 
-- **Zero code changes.** Wrap any script with `python -m bluepython --oss your_script.py`. No imports, no SDK integration required. A one-time [sensor config](#quick-start) enables the hooks you need.
+- **Zero code changes.** Wrap any script with `python -m bluerock --oss your_script.py`. No imports, no SDK integration required. A one-time [sensor config](#quick-start) enables the hooks you need.
 - **Two-layer hooking.** `sys.meta_path` for every module import (with SHA256 verification), `wrapt` for MCP protocol monitoring. Additional hook layers (process spawns, ctypes, HTTP frameworks, LLM APIs) are available in the [full version](https://www.bluerock.io/try-bluerock).
 - **Full MCP coverage.** Tool calls, resource access, prompt requests, session lifecycle, and transport connections across stdio, HTTP, and SSE.
 - **Hooks before your code runs.** Instrumentation activates at Python startup. Operations from your code, your dependencies, and their transitive dependencies all emit events.
@@ -98,7 +98,7 @@ Every hooked operation emits a structured JSON event to an NDJSON log file at `~
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  python -m bluepython --oss your_app.py                      │
+│  python -m bluerock --oss your_app.py                      │
 │                                                              │
 │       ┌──────────────┐              ┌──────────────────┐     │
 │       │ import hooks │              │    MCP hooks     │     │
@@ -129,7 +129,7 @@ Every hooked operation emits a structured JSON event to an NDJSON log file at `~
 python3 -m venv venv && source venv/bin/activate
 pip install bluerock[oss]
 
-python -m bluepython --help
+python -m bluerock --help
 python -c "import bluerock_oss; print('DSO:', bluerock_oss.get_dso_path())"
 ```
 
@@ -148,7 +148,7 @@ python3 -m venv venv && source venv/bin/activate
 pip install bluerock-<version>-py3-none-any.whl
 pip install bluerock_oss-<version>-<cpXY>-<platform>.whl
 
-python -m bluepython --help
+python -m bluerock --help
 python -c "import bluerock_oss; print('DSO:', bluerock_oss.get_dso_path())"
 ```
 
@@ -188,7 +188,7 @@ pip install acoustic/python-oss/
 pip install mcp fastmcp
 
 # 7. Verify
-python -m bluepython --help
+python -m bluerock --help
 ```
 
 Both install methods produce the same result: a working `bluerock` + `bluerock-oss` installation. The sensor discovers the DSO automatically via the installed `bluerock_oss` Python package.
@@ -234,13 +234,13 @@ EOF
 Run any Python script under BlueRock:
 
 ```bash
-python -m bluepython --oss --cfg-dir ~/.bluerock your_script.py
+python -m bluerock --oss --cfg-dir ~/.bluerock your_script.py
 ```
 
 Or run an MCP server module:
 
 ```bash
-python -m bluepython --oss --cfg-dir ~/.bluerock your_mcp_server.py
+python -m bluerock --oss --cfg-dir ~/.bluerock your_mcp_server.py
 ```
 
 See [CONFIG.md](acoustic/python/CONFIG.md) for all sensor options. In this release, only **MCP** and **Imports** are active. The remaining options listed in CONFIG.md require the [full version](https://www.bluerock.io/try-bluerock).
@@ -280,7 +280,7 @@ Running an MCP server produces events like these (one JSON object per line, wrap
 ## CLI Reference
 
 ```
-python3 -m bluepython --oss [OPTIONS] [script.py | -m module] [args...]
+python3 -m bluerock --oss [OPTIONS] [script.py | -m module] [args...]
 
 Options:
   --oss                Use the OSS backend (required for pip-installed bluerock)
@@ -314,7 +314,7 @@ When imported, bluepython activates its hooks in the current process. Events are
 
 ### Persistent install (sitecustomize)
 
-> **Note:** Persistent install is designed for the [full version](https://www.bluerock.io/try-bluerock). For OSS users, use the `python -m bluepython --oss` prefix or `import bluepython` in your code.
+> **Note:** Persistent install is designed for the [full version](https://www.bluerock.io/try-bluerock). For OSS users, use the `python -m bluerock --oss` prefix or `import bluepython` in your code.
 
 ## What Gets Monitored
 
@@ -458,7 +458,7 @@ See the [`examples/`](examples/) directory for runnable demos:
 - **[MCP examples](examples/mcp/)** — multi-transport examples (stdio, HTTP with auth, SSE), generic client, weather server
 - **[MCP monitoring](examples/ai-hooks/mcp-monitoring/)** — simple client/server pair for quick testing
 
-Each example is a self-contained script you run with `python -m bluepython --oss <script>.py`.
+Each example is a self-contained script you run with `python -m bluerock --oss <script>.py`.
 
 ## Project Structure
 
@@ -472,7 +472,7 @@ acoustic/
   python/
     bluepython/        # Python sensor (bluerock on PyPI)
       backend.py       # DSO discovery, event composition, ctypes FFI
-      common.py        # CLI entry point (python -m bluepython)
+      common.py        # CLI entry point (python -m bluerock)
       import_hooks.py  # sys.meta_path import monitor
       cfg.py           # Sensor config loading
       *_hooks.py       # Per-framework hook modules

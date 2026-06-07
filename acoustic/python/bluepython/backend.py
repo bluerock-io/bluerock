@@ -38,7 +38,12 @@ _current_span = contextvars.ContextVar("_current_span", default=None)
 
 # Exception that is raised when a "block" remediation happens.
 class Remediation(Exception):
-    pass
+    def __init__(self, *, event_kind=None):
+        self.event_kind = event_kind
+        msg = "blocked by acoustic policy"
+        if event_kind:
+            msg += f" (event={event_kind})"
+        super().__init__(msg)
 
 
 # Exception that is raised when a "modify" remediation happens.
@@ -355,6 +360,8 @@ class AcousticBackend:
 
     def __init__(self):
         self._lib = AcousticLib(oss=cfg.config.oss)
+        # acoustic_init emits sensor_startup itself once the backend handshake
+        # completes; bluepython does not need to send it explicitly.
         self._lib.init()
 
         self.component_id = self._lib.get_runtime_info()["component_id"]
@@ -369,8 +376,6 @@ class AcousticBackend:
             self._thread.daemon = True
             self._thread.start()
 
-        self._lifecycle_startup()
-
     def reset(self):
         self._lib.reset()
 
@@ -379,7 +384,8 @@ class AcousticBackend:
         if sensor_remediation:
             if sensor_remediation == ACOUSTIC_REMEDIATE_MODIFY:
                 raise ModifyRemediation(modification)
-            raise Remediation()
+            event_kind = evt.get("event") or evt.get("meta", {}).get("name")
+            raise Remediation(event_kind=event_kind)
 
     def tracing_stderr(self):
         self._lib.tracing_stderr()
@@ -410,21 +416,6 @@ class AcousticBackend:
             handle_config_update=self._handle_config_update,
             handle_policy_revoked=self._handle_policy_revoked,
         )
-
-    def _lifecycle_startup(self):
-        evt = {
-            "meta": {
-                "name": "sensor_startup",
-                "type": "sensor_lifecycle",
-                "origin": "bluepython",
-                "sensor_id": self.sensor_id,
-                "source_event_id": 0,
-                "component_id": self.component_id,
-            },
-            "pid": os.getpid(),
-            "file_path": sys.argv[0],
-        }
-        self.emit_event(evt)
 
     def _handle_config_update(self, config_obj):
         try:

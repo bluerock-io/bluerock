@@ -26,7 +26,7 @@ echo '{"enable": true, "mcp": true, "imports": true}' > ~/.bluerock/bluerock-oss
 
 ```bash
 cd examples/mcp/
-python -m bluepython --oss mcp_client.py --mcp_server mcp_test_server.py --transport stdio
+python -m bluerock --oss mcp_client.py --mcp_server mcp_test_server.py --transport stdio
 
 # Events written to ~/.bluerock/event-spool/*.ndjson
 cat ~/.bluerock/event-spool/python-*.ndjson | jq '.event | select(.meta.name | startswith("python_mcp_"))'
@@ -38,10 +38,10 @@ cat ~/.bluerock/event-spool/python-*.ndjson | jq '.event | select(.meta.name | s
 cd examples/mcp/
 
 # Start the file server (separate terminal)
-python -m bluepython --oss mcp_file_server.py
+python -m bluerock --oss mcp_file_server.py
 
 # Connect with the generic client
-python -m bluepython --oss mcp_client.py --transport http --mcp_auth_token dev-test-token
+python -m bluerock --oss mcp_client.py --transport http --mcp_auth_token dev-test-token
 ```
 
 ### SSE
@@ -50,10 +50,10 @@ python -m bluepython --oss mcp_client.py --transport http --mcp_auth_token dev-t
 cd examples/mcp/
 
 # Start the linux admin server (separate terminal)
-python -m bluepython --oss mcp_linux_admin.py
+python -m bluerock --oss mcp_linux_admin.py
 
 # Connect with the generic client
-python -m bluepython --oss mcp_client.py --transport sse
+python -m bluerock --oss mcp_client.py --transport sse
 ```
 
 ## Requirements

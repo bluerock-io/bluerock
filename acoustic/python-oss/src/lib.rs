@@ -11,6 +11,61 @@ use std::path::PathBuf;
 use std::sync::OnceLock;
 use thiserror::Error;
 
+/// Identity carrier published by the BlueRock host runtime. Mirrors the format and
+/// resolution chain (file > env) of `acoustic::identity` on the main
+/// backend; keep the two in sync.
+mod identity {
+    use std::collections::HashMap;
+    use std::sync::OnceLock;
+
+    const BRU_FILE_PATH: &str = "/etc/bluerock.env";
+
+    static BRU_FIELDS: OnceLock<HashMap<String, String>> = OnceLock::new();
+
+    pub fn component_id() -> Option<String> {
+        from_file_or_env("component_id", "BRU_COMPONENT_ID")
+    }
+
+    pub fn principal() -> Option<String> {
+        from_file_or_env("principal", "BRU_PRINCIPAL")
+    }
+
+    pub fn policy_hint() -> Option<String> {
+        from_file_or_env("policy_hint", "ACOUSTIC_POLICY_HINT")
+    }
+
+    fn from_file_or_env(file_key: &str, env_key: &str) -> Option<String> {
+        if let Some(v) = field(file_key) {
+            return Some(v.to_owned());
+        }
+        std::env::var(env_key).ok().filter(|s| !s.is_empty())
+    }
+
+    fn field(key: &str) -> Option<&'static str> {
+        BRU_FIELDS
+            .get_or_init(|| {
+                let mut out = HashMap::new();
+                let contents = std::fs::read_to_string(BRU_FILE_PATH).unwrap_or_default();
+                for line in contents.lines() {
+                    let line = line.trim();
+                    if line.is_empty() || line.starts_with('#') {
+                        continue;
+                    }
+                    if let Some((k, v)) = line.split_once('=') {
+                        let k = k.trim();
+                        if !k.is_empty() {
+                            out.insert(k.to_owned(), v.trim().to_owned());
+                        }
+                    }
+                }
+                out
+            })
+            .get(key)
+            .map(String::as_str)
+            .filter(|s| !s.is_empty())
+    }
+}
+
 #[derive(Debug, Error)]
 enum Error {
     #[error("Invalid arguments: {0}")]
@@ -44,20 +99,19 @@ impl AcousticStatus {
 
 static SENSOR_CONFIG: OnceLock<serde_json::Value> = OnceLock::new();
 static COMPONENT_ID: OnceLock<String> = OnceLock::new();
+static PRINCIPAL: OnceLock<Option<String>> = OnceLock::new();
 
 fn component_id() -> &'static str {
     COMPONENT_ID.get_or_init(|| {
-        if let Ok(v) = std::env::var("BRU_COMPONENT_ID")
-            && !v.is_empty()
-        {
-            return v;
-        }
-        let policy = std::env::var("ACOUSTIC_POLICY_HINT")
-            .ok()
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| "default".to_owned());
-        format!("{policy}/{}", uuid::Uuid::new_v4())
+        identity::component_id().unwrap_or_else(|| {
+            let policy = identity::policy_hint().unwrap_or_else(|| "default".to_owned());
+            format!("{policy}/{}", uuid::Uuid::new_v4())
+        })
     })
+}
+
+fn principal() -> Option<&'static str> {
+    PRINCIPAL.get_or_init(identity::principal).as_deref()
 }
 
 fn load_sensor_config(metadata_ptr: *const c_char) {
@@ -247,6 +301,7 @@ pub unsafe extern "C" fn acoustic_init(
     let dir = format!("{}/.bluerock/event-spool", home);
     let _ = std::fs::create_dir_all(&dir);
     rotate_event_spool(&dir);
+    let _ = spool_sensor_startup(&dir);
     0
 }
 
@@ -264,7 +319,43 @@ pub unsafe extern "C" fn acoustic_init_forksafe(
     let dir = format!("{}/.bluerock/event-spool", home);
     let _ = std::fs::create_dir_all(&dir);
     rotate_event_spool(&dir);
+    let _ = spool_sensor_startup(&dir);
     0
+}
+
+/// Mirror of `Library::send_sensor_startup` for the OSS backend, which has
+/// no backend connection — write the event straight to the spool. Sole
+/// consumer is bluepython, hence the hard-coded `bluepython` origin.
+fn spool_sensor_startup(dir: &str) -> std::io::Result<()> {
+    let mut event = serde_json::json!({
+        "meta": {
+            "name": "sensor_startup",
+            "type": "sensor_lifecycle",
+            "origin": "bluepython",
+            "sensor_id": 1u64,
+            "source_event_id": 0u64,
+            "component_id": component_id(),
+        },
+        "pid": std::process::id(),
+    });
+    if let Some(exe) = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.into_os_string().into_string().ok())
+    {
+        event["file_path"] = serde_json::Value::String(exe);
+    }
+    if let Some(p) = principal() {
+        event["principal"] = serde_json::Value::String(p.to_owned());
+    }
+    let pid = std::process::id();
+    let tid = get_thread_id();
+    let path = event_file_path(dir, pid, tid, 0);
+    let mut file = OpenOptions::new().create(true).append(true).open(&path)?;
+    let ts = chrono::Utc::now().to_rfc3339();
+    let envelope = serde_json::json!({"ts": ts, "event": event});
+    serde_json::to_writer(&mut file, &envelope)?;
+    file.write_all(b"\n")?;
+    Ok(())
 }
 
 /// Re-initializes libacoustic (e.g., after fork()).
@@ -366,7 +457,7 @@ pub unsafe extern "C" fn acoustic_get_sensor_config() -> c_int {
     }) as c_int
 }
 
-/// Retrieves runtime info (currently: component_id) and stores it into context.
+/// Retrieves runtime info (component_id, principal) and stores it into context.
 ///
 /// # Safety
 /// No pointer arguments. Always safe to call.
@@ -375,6 +466,7 @@ pub unsafe extern "C" fn acoustic_get_runtime_info() -> c_int {
     stash_return_value_into_context(|| {
         let json = serde_json::json!({
             "component_id": component_id(),
+            "principal": principal(),
         });
         Ok(Context::runtime_info(json))
     }) as c_int

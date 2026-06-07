@@ -16,7 +16,7 @@ async def main():
         "test_server": {
             "transport": "stdio",
             "command": "python",
-            "args": ["-m", "bluepython", "--oss", "--cfg-dir", os.path.expanduser("~/.bluerock"), args.mcp_server],
+            "args": ["-m", "bluerock", "--oss", "--cfg-dir", os.path.expanduser("~/.bluerock"), args.mcp_server],
         }
     }
     http_server_remote = {"deep_wiki": {"transport": "http", "url": "https://mcp.deepwiki.com/mcp"}}

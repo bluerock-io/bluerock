@@ -431,11 +431,12 @@ async def wrap_mcp_session_send_request_pre(fn, instance, args, kwargs):
                 "server_name": getattr(instance, "br_server_name", "null"),
             },
         )
-    except backend.Remediation:
+    except backend.Remediation as r:
         if cfg.sensor_config.mcp.remediation_exception:
             raise
-        new_request = types.ErrorData(code=types.INVALID_PARAMS, message="Remediation hook is executed", data=None)
-        kwargs["request"] = new_request
+        from mcp.shared.exceptions import McpError
+
+        raise McpError(types.ErrorData(code=types.INVALID_PARAMS, message=str(r), data=None)) from r
 
     # for future filtering and mutating of the request
     return args, kwargs
@@ -701,6 +702,15 @@ def wrap_fastmcp_local_provider_add_component(fn, instance, args, kwargs):
 
 @wrapt.when_imported("fastmcp")
 def apply_fastmcp_hooks(fastmcp):
+    # FastMCP.__init__ is the constructor for every fastmcp-based server. Without
+    # this hook bluepython only emits per-element `mcp_server_add` events, never
+    # `mcp_server_init`, so consumers never receive the server's name/version/
+    # instructions until the first live RPC happens to carry `server_name`. The
+    # existing `wrap_mcp_server_init` reads `instance.name`, `instance.version`,
+    # and `instance.instructions` — all attributes are present on
+    # `fastmcp.server.server.FastMCP` instances, so the same hook works as-is.
+    if importlib.util.find_spec("fastmcp.server.server"):
+        wrapper.wrap_function_wrapper("fastmcp.server.server", "FastMCP.__init__", wrap_mcp_server_init)
     # Old-style fastmcp had separate ToolManager/ResourceManager/PromptManager classes.
     # New-style fastmcp uses LocalProvider._add_component as the central registration point.
     if importlib.util.find_spec("fastmcp.tools.tool_manager"):

@@ -41,7 +41,7 @@ def measure_time(fn):
         finally:
             runtime = time.monotonic() - start_time
             with Lock:
-                Cumulative[fn.__name__].process(runtime)
+                Cumulative[getattr(fn, "__name__", None) or type(fn).__name__].process(runtime)
 
     return profile_wrapper
 

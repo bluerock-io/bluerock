@@ -17,7 +17,7 @@ pip install bluerock[oss] mcp
 Run the client, which launches the server as a BlueRock-instrumented subprocess:
 
 ```bash
-python -m bluepython --oss --cfg-dir ~/.bluerock mcp_client.py
+python -m bluerock --oss --cfg-dir ~/.bluerock mcp_client.py
 ```
 
 You should see output like:
@@ -102,7 +102,7 @@ Three categories of MCP events are emitted:
 
 BlueRock uses `@wrapt.when_imported("mcp")` to hook the FastMCP server class. Server lifecycle events (`init`, tool registration) are captured by patching the `FastMCP` constructor and `tool()` decorator. Protocol-level events are captured by instrumenting the JSON-RPC transport layer.
 
-The client script launches the server under `python -m bluepython --oss`, so the server subprocess is also instrumented. Both processes write to `~/.bluerock/event-spool/`, each with its own PID-stamped NDJSON file.
+The client script launches the server under `python -m bluerock --oss`, so the server subprocess is also instrumented. Both processes write to `~/.bluerock/event-spool/`, each with its own PID-stamped NDJSON file.
 
 ## Platform Notes
 

@@ -2,6 +2,21 @@
 
 All notable changes to BlueRock are documented here.
 
+## [0.2.0] - 2026-06-07
+
+### Changed
+- Sensor entrypoint is now `python -m bluerock` (previously `python -m bluepython`).
+  Update any wrapper commands, persistent-install steps, and scripts accordingly.
+
+### Added
+- `bluerock` package providing the `python -m bluerock` entrypoint.
+- `sensor_startup` event now emitted automatically when the sensor initializes.
+- Backend connection loss is now reported by the sensor.
+- Broader MCP server-initialization monitoring, including FastMCP.
+
+### Fixed
+- Assorted Python sensor fixes (config handling, MCP hooks, process wrapping).
+
 ## [0.1.0] - 2026-04-17
 
 ### Added

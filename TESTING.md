@@ -9,7 +9,7 @@ BlueRock has three test runners, each validating a different layer:
 | Runner | What It Tests | Location |
 |--------|--------------|----------|
 | `pytest` | DSO smoke tests — ctypes FFI, import resolution | `acoustic/python/tests/test_smoke.py`, `test_bluepython_import.py` |
-| `run-tests-oss.py` | Integration tests — runs scripts under `python -m bluepython --oss`, validates NDJSON events | `acoustic/run-tests-oss.py` |
+| `run-tests-oss.py` | Integration tests — runs scripts under `python -m bluerock --oss`, validates NDJSON events | `acoustic/run-tests-oss.py` |
 | `run-examples.py` | Cookbook examples — validates example scripts produce expected events | `examples/run-examples.py` |
 
 ## Running the Full Suite
@@ -80,7 +80,7 @@ python examples/run-examples.py --select ai-mcp
 1. Import test case definitions from `acoustic/sensor_tests/python.py`
 2. Filter by `OSS_ALLOWLIST` (tests requiring the full sensor backend are excluded)
 3. Create a temporary directory with `bluerock-oss.json` containing the sensor config
-4. For each test: clean `~/.bluerock/event-spool/`, run via `python -m bluepython --oss --cfg-dir <tmpdir> -- <script>.py`
+4. For each test: clean `~/.bluerock/event-spool/`, run via `python -m bluerock --oss --cfg-dir <tmpdir> -- <script>.py`
 5. Collect NDJSON events from `~/.bluerock/event-spool/`
 6. Validate events using the test case's `event_parser` callback
 7. Check for unexpected internal exception events
@@ -88,7 +88,7 @@ python examples/run-examples.py --select ai-mcp
 ### run-examples.py
 
 1. Create a shared temporary directory with `bluerock-oss.json` enabling all hooks used by examples
-2. For each example: clean `~/.bluerock/event-spool/`, run via `python -m bluepython --oss --cfg-dir <tmpdir> <script>`
+2. For each example: clean `~/.bluerock/event-spool/`, run via `python -m bluerock --oss --cfg-dir <tmpdir> <script>`
 3. Collect NDJSON events from `~/.bluerock/event-spool/`
 4. Validate events using `EventChecker` (all listed events must be present)
 5. Validate event meta-fields (`name`, `type`, `origin`, `sensor_id`, `source_event_id`)

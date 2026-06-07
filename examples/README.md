@@ -15,7 +15,7 @@ pip install mcp fastmcp
 Verify the installation:
 
 ```bash
-python -m bluepython --help
+python -m bluerock --help
 ```
 
 ## Running an Example
@@ -36,7 +36,7 @@ python -m bluepython --help
 3. Run the script under BlueRock:
 
    ```bash
-   python -m bluepython --oss --cfg-dir ~/.bluerock mcp_test_server.py
+   python -m bluerock --oss --cfg-dir ~/.bluerock mcp_test_server.py
    ```
 
 4. Read the events:
@@ -51,7 +51,7 @@ python -m bluepython --help
 
 ### MCP Events Captured
 
-Running any example under `python -m bluepython --oss` emits these events:
+Running any example under `python -m bluerock --oss` emits these events:
 
 | Event | What It Captures |
 |-------|-----------------|
@@ -103,7 +103,7 @@ Validate all examples with the included test runner:
 python examples/run-examples.py
 ```
 
-The runner creates a temporary config directory with `bluerock-oss.json`, executes each script under `python -m bluepython --oss --cfg-dir <tmpdir>`, parses the NDJSON output, and verifies the expected events were emitted.
+The runner creates a temporary config directory with `bluerock-oss.json`, executes each script under `python -m bluerock --oss --cfg-dir <tmpdir>`, parses the NDJSON output, and verifies the expected events were emitted.
 
 | Flag | Effect |
 |------|--------|

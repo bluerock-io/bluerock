@@ -19,7 +19,7 @@ See [CONFIG.md](acoustic/python/CONFIG.md) for all available options.
 ## 3. Run
 
 ```bash
-python -m bluepython --oss --cfg-dir ~/.bluerock your_script.py
+python -m bluerock --oss --cfg-dir ~/.bluerock your_script.py
 ```
 
 The `--oss` flag is also auto-detected when `bluerock-oss` is installed.

@@ -6,9 +6,9 @@ the prompt produces a fresh python_mcp_event in the event spool.
 
 Usage:
     1. Start the server in a separate pane (long-running):
-         python -m bluepython --oss mcp_linux_admin.py
+         python -m bluerock --oss mcp_linux_admin.py
     2. Connect with this REPL:
-         python -m bluepython --oss repl_sse.py
+         python -m bluerock --oss repl_sse.py
        (or pass --url to point at a different host/port)
 
 Commands:

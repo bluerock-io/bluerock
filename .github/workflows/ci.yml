@@ -117,7 +117,7 @@ jobs:
         run: |
           pip install -r .github/requirements/build-cibw.txt
           pip install acoustic/python-oss/
-      - run: python -m bluepython --help
+      - run: python -m bluerock --help
       # integration tests — DSO is discovered via the installed bluerock-oss package.
       - run: pytest acoustic/python/tests/test_bluepython_import.py acoustic/python/tests/test_smoke.py -v --no-header
       - name: Run OSS integration tests

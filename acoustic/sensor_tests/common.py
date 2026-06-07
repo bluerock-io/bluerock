@@ -25,13 +25,22 @@ class TestCase:
         self.event_parser = event_parser
 
 
+def _is_subset(expected, actual):
+    """Return True if expected is a subset of actual (recursive for dicts)."""
+    if isinstance(expected, dict):
+        if not isinstance(actual, dict):
+            return False
+        return all(k in actual and _is_subset(v, actual[k]) for k, v in expected.items())
+    return expected == actual
+
+
 def check_for_event(events, name, attributes={}):
     for data in events:
         if data["meta"]["name"] == name:
             found = True  # Assume we found the event, will change found if attrs don't match
 
             for k, v in attributes.items():
-                if k not in data or data[k] != v:
+                if k not in data or not _is_subset(v, data[k]):
                     found = False  # Attrs didn't match
 
             if found:

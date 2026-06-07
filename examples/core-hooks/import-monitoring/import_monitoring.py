@@ -8,7 +8,7 @@ including the fully-qualified module name, the on-disk SHA-256 hash of the
 module file, and the installed package version (when available).
 
 Run:
-    python -m bluepython --oss import_monitoring.py
+    python -m bluerock --oss import_monitoring.py
 
 Events written to ~/.bluerock/event-spool/*.ndjson
 """

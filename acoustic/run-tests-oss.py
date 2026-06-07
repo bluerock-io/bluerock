@@ -109,7 +109,7 @@ async def main():
 
             pargs = [sys.executable]
             if not args.without_bru:
-                pargs.extend(["-m", "bluepython", "--oss", "--cfg-dir", tmpdir_name])
+                pargs.extend(["-m", "bluerock", "--oss", "--cfg-dir", tmpdir_name])
                 pargs.extend(case.extra_flags)
                 pargs.extend(["--", f"{case.module}.py"])
             else:

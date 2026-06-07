@@ -25,7 +25,7 @@ pip install setuptools-rust
 pip install acoustic/python-oss/
 
 # 4. Verify
-python -m bluepython --help
+python -m bluerock --help
 python -c "import bluerock_oss; print('DSO:', bluerock_oss.get_dso_path())"
 ```
 
@@ -110,7 +110,7 @@ acoustic/
   python/
     bluepython/         # Python sensor (bluerock on PyPI)
       backend.py        # DSO discovery, event composition, ctypes FFI
-      common.py         # CLI entry point (python -m bluepython)
+      common.py         # CLI entry point (python -m bluerock)
       import_hooks.py   # sys.meta_path import monitor
       cfg.py            # Sensor config loading
       *_hooks.py        # Per-framework hook modules

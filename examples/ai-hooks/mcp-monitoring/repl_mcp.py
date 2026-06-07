@@ -1,7 +1,7 @@
 """Interactive MCP REPL — type tool calls, see events flow live.
 
 Run:
-    python -m bluepython --oss repl_mcp.py
+    python -m bluerock --oss repl_mcp.py
 
 Commands:
     tools                  list available tools
@@ -38,7 +38,7 @@ async def repl():
     cfg_dir = os.path.join(os.path.expanduser("~"), ".bluerock")
     server_params = StdioServerParameters(
         command=sys.executable,
-        args=["-m", "bluepython", "--oss", "--cfg-dir", cfg_dir, server_script],
+        args=["-m", "bluerock", "--oss", "--cfg-dir", cfg_dir, server_script],
     )
     async with stdio_client(server_params) as (read, write):
         async with ClientSession(read, write) as session:

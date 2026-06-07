@@ -76,7 +76,7 @@ build-backend = "setuptools.build_meta"
 line-length = 120
 
 [tool.setuptools]
-packages = ["bluepython", "bluepython.sdk"]
+packages = ["bluepython", "bluepython.sdk", "bluerock"]
 
 [tool.setuptools_scm]
 fallback_version = "0.0.0.dev0"

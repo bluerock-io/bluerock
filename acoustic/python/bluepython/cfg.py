@@ -134,6 +134,14 @@ def load_cfg(path):
         sys.exit(1)
     if config.cfg_dir is None:
         config.cfg_dir = os.path.dirname(os.path.realpath(path))
+    # Env vars override the cfg file; CLI args (load_cfg_from_args) override env.
+    # the BlueRock runtime injects both vars when spawning sandboxed children.
+    acoustic_dso_env = os.environ.get("BLUEROCK_ACOUSTIC_DSO")
+    if acoustic_dso_env:
+        config.acoustic_dso = acoustic_dso_env
+    acoustic_socket_env = os.environ.get("BLUEROCK_ACOUSTIC_SOCKET")
+    if acoustic_socket_env:
+        config.acoustic_socket = acoustic_socket_env
 
 
 def add_config_args(parser):

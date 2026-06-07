@@ -3,7 +3,7 @@
 
 """Example test runner for BlueRock examples.
 
-Runs each example script under ``python -m bluepython --oss``, collects NDJSON
+Runs each example script under ``python -m bluerock --oss``, collects NDJSON
 events from ~/.bluerock/event-spool/, and validates that the expected events were
 emitted.  Follows the same pattern as acoustic/run-tests-oss.py.
 
@@ -200,7 +200,7 @@ def main():
         server_proc = None
         if case.server_script:
             server_args = [
-                sys.executable, "-m", "bluepython", "--oss", "--cfg-dir", cfg_dir,
+                sys.executable, "-m", "bluerock", "--oss", "--cfg-dir", cfg_dir,
                 "--", case.server_script,
             ]
             server_proc = subprocess.Popen(server_args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd=examples_dir)
@@ -214,7 +214,7 @@ def main():
         pargs = [
             sys.executable,
             "-m",
-            "bluepython",
+            "bluerock",
             "--oss",
             "--cfg-dir",
             cfg_dir,

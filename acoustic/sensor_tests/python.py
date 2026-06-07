@@ -143,6 +143,34 @@ def check_sqlite_event(events):
     )
 
 
+def check_python_server_hooks_fired(events):
+    ok = check_for_event(events, "python_mcp_server_init", {"server": {"name": "test-python-server"}})
+    ok = ok and check_for_event(events, "python_mcp_server_add", {"element": {"type": "tool", "name": "safe_tool"}})
+    return ok
+
+
+def check_python_deny_tool_call_server(events):
+    ok = check_for_event(events, "python_mcp_event", {"event": "server_received_request"})
+    ok = ok and check_for_event(events, "mcp_policy_violation")
+    return ok
+
+
+def check_python_tool_discovery_modify(events):
+    return check_for_event(events, "python_mcp_event", {"event": "server_received_request"})
+
+
+def check_python_client_tool_discovery_filter(events):
+    return check_for_event(events, "mcp_policy_violation")
+
+
+def check_python_deny_stdio_connect(events):
+    return check_for_event(events, "python_mcp_client_connect", {"server": {"type": "stdio"}})
+
+
+def check_python_allow_stdio_exception(events):
+    return check_for_event(events, "python_mcp_client_connect", {"server": {"type": "stdio", "command": "python"}})
+
+
 def check_mcp_span_events(events):
     if not check_for_event(events, "python_span_start", {"name": "mcp_server_message"}):
         return False
@@ -291,6 +319,11 @@ python_test_cases = [
         event_parser=check_mcp_span_events,
     ),
     PythonTestCase(
+        "test_fastmcp_tool",
+        extra_deps=["fastmcp"],
+        event_parser=check_mcp_span_events,
+    ),
+    PythonTestCase(
         "test_anthropic",
         # extra_deps=["anthropic"],
         module="test_anthropic",
@@ -340,6 +373,43 @@ python_test_cases = [
         "test_mcp_tool",
         extra_deps=["mcp"],
         event_parser=check_mcp_tool_events,
+    ),
+    PythonTestCase(
+        "test_mcp_server_hooks",
+        extra_deps=["mcp"],
+        event_parser=check_python_server_hooks_fired,
+    ),
+    PythonTestCase(
+        "test_mcp_deny_tool_call_server",
+        extra_deps=["mcp"],
+        non_zero_exit=True,
+        policy="python/deny-tool/python.json",
+        event_parser=check_python_deny_tool_call_server,
+    ),
+    PythonTestCase(
+        "test_mcp_tool_discovery_modify",
+        extra_deps=["mcp"],
+        policy="python/deny-tool/python.json",
+        event_parser=check_python_tool_discovery_modify,
+    ),
+    PythonTestCase(
+        "test_mcp_client_tool_discovery_filter",
+        extra_deps=["mcp"],
+        policy="python/deny-tool-client/python.json",
+        event_parser=check_python_client_tool_discovery_filter,
+    ),
+    PythonTestCase(
+        "test_mcp_deny_stdio_connect",
+        extra_deps=["mcp"],
+        non_zero_exit=True,
+        policy="python/deny-stdio/python.json",
+        event_parser=check_python_deny_stdio_connect,
+    ),
+    PythonTestCase(
+        "test_mcp_allow_stdio_exception",
+        extra_deps=["mcp"],
+        policy="python/deny-stdio-exception/python.json",
+        event_parser=check_python_allow_stdio_exception,
     ),
 ]
 

@@ -20,7 +20,7 @@ Create a sensor config and run any Python script under BlueRock:
 ```bash
 mkdir -p ~/.bluerock
 echo '{"enable": true, "mcp": true, "imports": true}' > ~/.bluerock/bluerock-oss.json
-python -m bluepython --oss --cfg-dir ~/.bluerock your_script.py
+python -m bluerock --oss --cfg-dir ~/.bluerock your_script.py
 ```
 
 Events are written to `~/.bluerock/event-spool/python-{pid}-{tid}.{generation}.ndjson`:
@@ -78,7 +78,7 @@ Every line in the NDJSON log is a timestamped envelope wrapping an event. Use `j
 ## CLI Reference
 
 ```
-python3 -m bluepython --oss [OPTIONS] [script.py | -m module] [args...]
+python3 -m bluerock --oss [OPTIONS] [script.py | -m module] [args...]
 
 Options:
   --oss                Use OSS backend (also auto-detected when bluerock-oss is installed)
@@ -87,6 +87,27 @@ Options:
   --debug              Print debug logs to stderr
   --install            Install bluerock autostart (sitecustomize)
   --uninstall          Remove bluerock autostart
+```
+
+## Uninstall
+
+For the standard venv install, uninstall is a single pip call:
+
+```bash
+pip uninstall -y bluerock-oss bluerock
+```
+
+If you also ran `python -m bluepython.installer install --oss` to wire the sensor into interpreter startup, remove that first, then pip uninstall:
+
+```bash
+python -m bluepython.installer uninstall
+pip uninstall -y bluerock-oss bluerock
+```
+
+User data under `~/.bluerock/` (config, event spool) is left in place. Remove it for a full wipe:
+
+```bash
+rm -rf ~/.bluerock
 ```
 
 ## Links

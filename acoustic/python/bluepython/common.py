@@ -135,7 +135,7 @@ def main():
         print("bluepython: python >= 3.10 is required. Aborting.", file=sys.stderr)
         sys.exit(1)
 
-    parser = argparse.ArgumentParser(prog="python3 -m bluepython")
+    parser = argparse.ArgumentParser(prog="python3 -m bluerock")
     parser.add_argument("path", nargs="?", help="Python script to run (unless -m is given)")
     parser.add_argument("args", nargs=argparse.REMAINDER, metavar="...", help="Additional arguments")
     parser.add_argument("-m", dest="module", help="Execute Python module instead of file")
@@ -143,12 +143,14 @@ def main():
     install_group = parser.add_mutually_exclusive_group()
     install_group.add_argument("--install", action="store_true", help="Install BRU Python sensor autostart")
     install_group.add_argument("--uninstall", action="store_true", help="Uninstall BRU Python sensor")
+    parser.add_argument("--sitecustomize", action="store_true", help="Force sitecustomize.py install method")
     cfg.add_config_args(parser)
 
     args = parser.parse_args()
 
     if args.install:
-        installer.install()
+        method = installer.Method.SITECUSTOMIZE if args.sitecustomize else None
+        installer.install(method=method)
         return
     elif args.uninstall:
         installer.uninstall()

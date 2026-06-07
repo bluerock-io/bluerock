@@ -11,7 +11,7 @@ pip install requests
 ## Run
 
 ```bash
-python -m bluepython --oss import_monitoring.py
+python -m bluerock --oss import_monitoring.py
 ```
 
 The script imports `requests` and prints its version. BlueRock captures `python_import` events for `requests` and all of its transitive dependencies (`urllib3`, `charset_normalizer`, `certifi`, etc.).
