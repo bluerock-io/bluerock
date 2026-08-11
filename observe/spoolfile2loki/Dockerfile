@@ -15,7 +15,7 @@ ARG TARGETOS
 ARG TARGETARCH
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o spoolfile2loki ./cmd/spoolfile2loki
 
-FROM alpine:3.19
+FROM alpine:3.24.1
 
 # Install runtime dependencies
 RUN apk add --no-cache \
