@@ -89,7 +89,7 @@ jobs:
             exit 1
           fi
           echo "deployment_target=$TARGET" >> "$GITHUB_OUTPUT"
-      - uses: pypa/cibuildwheel@4726cd35bb13f7bde50cf2761f2499ac7b3aa32c  # v4.1.1
+      - uses: pypa/cibuildwheel@1828c10ab37f080699c7b81cea34097c684a7074  # v4.2.0
         with:
           package-dir: acoustic/python-oss
         env:
@@ -107,7 +107,7 @@ jobs:
           CIBW_ENVIRONMENT_LINUX: 'PATH="$HOME/.cargo/bin:$PATH" SETUPTOOLS_SCM_PRETEND_VERSION=${{ steps.version.outputs.VERSION }}'
           CIBW_ENVIRONMENT_MACOS: 'MACOSX_DEPLOYMENT_TARGET=${{ steps.macos.outputs.deployment_target }} SETUPTOOLS_SCM_PRETEND_VERSION=${{ steps.version.outputs.VERSION }}'
       - name: Sign build provenance for wheels
-        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373  # v4.1.1
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
         with:
           subject-path: 'wheelhouse/*.whl'
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
@@ -154,7 +154,7 @@ jobs:
         env:
           SETUPTOOLS_SCM_PRETEND_VERSION: ${{ steps.version.outputs.VERSION }}
       - name: Sign build provenance for wheel
-        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373  # v4.1.1
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
         with:
           subject-path: 'acoustic/python/dist/*.whl'
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
@@ -268,7 +268,7 @@ jobs:
           pattern: wheels-oss-*
           path: dist/oss/
           merge-multiple: true
-      - uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247  # v1.14.1
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # v1.14.2
         with:
           repository-url: https://test.pypi.org/legacy/
           packages-dir: dist/oss/
@@ -282,7 +282,7 @@ jobs:
         with:
           name: wheels-bluerock
           path: dist/bluerock/
-      - uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247  # v1.14.1
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # v1.14.2
         with:
           repository-url: https://test.pypi.org/legacy/
           packages-dir: dist/bluerock/
@@ -366,7 +366,7 @@ jobs:
           pattern: wheels-oss-*
           path: dist/oss/
           merge-multiple: true
-      - uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247  # v1.14.1
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # v1.14.2
         with:
           packages-dir: dist/oss/
           # skip_existing lets an operator re-run the workflow after a
@@ -379,7 +379,7 @@ jobs:
         with:
           name: wheels-bluerock
           path: dist/bluerock/
-      - uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247  # v1.14.1
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # v1.14.2
         with:
           packages-dir: dist/bluerock/
           skip-existing: true
