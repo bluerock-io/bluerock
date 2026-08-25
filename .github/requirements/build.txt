@@ -4,4 +4,4 @@
 # for that container, not here on the host.
 build==1.5.0
 setuptools-scm==10.2.1
-cibuildwheel==4.1.0
+cibuildwheel==4.2.0
