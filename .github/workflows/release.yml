@@ -89,7 +89,7 @@ jobs:
             exit 1
           fi
           echo "deployment_target=$TARGET" >> "$GITHUB_OUTPUT"
-      - uses: pypa/cibuildwheel@1828c10ab37f080699c7b81cea34097c684a7074  # v4.2.0
+      - uses: pypa/cibuildwheel@e090b81e30c4d855ea63bf4b6e59204c09a101ae  # v4.2.1
         with:
           package-dir: acoustic/python-oss
         env:
