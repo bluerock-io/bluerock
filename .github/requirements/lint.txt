@@ -1,5 +1,5 @@
 # CI lint tools. Dependabot bumps automatically.
 black==26.5.1
-ruff==0.16.0
-pip-tools==7.6.0
-pre-commit==4.6.1
+ruff==0.16.3
+pip-tools==7.6.1
+pre-commit==4.6.2

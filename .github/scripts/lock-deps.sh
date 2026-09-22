@@ -43,17 +43,24 @@ cd "$WORK_DIR"
 
 # normalize the machine-specific bits pip-compile bakes into lockfile
 # output, so the same pyproject resolves to byte-identical output on
-# any host. without this, two sources of drift:
+# any host. without this, three sources of drift:
 #   - absolute file:// paths for editable installs (-e .) get written
 #     as the generating machine's absolute path. different on local
 #     vs github CI vs elsewhere.
 #   - --output-file=<path> gets written into the header comment, so
 #     the generate path (requirements.lock) and verify path (mktemp)
 #     produce different headers even when content matches.
+#   - the header lists flags nobody passed. pip-compile rebuilds it from
+#     its own option table and omits an option only when its value still
+#     matches the declared default, so whichever click it resolves at
+#     install time decides whether a switched-off flag shows up. --no-index
+#     is the one that reaches us. drop it: we never pass it, and a lockfile
+#     genuinely compiled without an index would have resolved nothing.
 normalize_lockfile() {
     local f="$1"
     sed -i -E \
         -e '/^#    pip-compile /s| --[a-z_-]+=None||g' \
+        -e '/^#    pip-compile /s| --no-index||g' \
         -e 's|(--output-file=)[^[:space:]]+|\1requirements.lock|' \
         -e 's|^-e file://[^[:space:]]*/acoustic/python$|-e .|' \
         -e 's|^-e file://[^[:space:]]*/acoustic/python-oss$|-e ../python-oss|' \

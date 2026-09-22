@@ -19,8 +19,10 @@ certifi==2026.2.25
     # via requests
 charset-normalizer==3.4.7
     # via requests
-idna==3.11
-    # via requests
+idna==3.20
+    # via
+    #   bluerock
+    #   requests
 numpy==2.4.4
     # via bluerock
 pydantic==2.13.2
@@ -40,7 +42,9 @@ typing-extensions==4.15.0
     #   typing-inspection
 typing-inspection==0.4.2
     # via pydantic
-urllib3==2.6.3
-    # via requests
+urllib3==2.8.0
+    # via
+    #   bluerock
+    #   requests
 wrapt==2.1.2
     # via bluerock

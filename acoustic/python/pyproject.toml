@@ -46,9 +46,18 @@ dependencies = [
 [project.optional-dependencies]
 oss = [
     "bluerock-oss",
+    # floors on two of requests' own dependencies. requests accepts far
+    # older versions of both, and neither is something we import directly,
+    # so without a floor here the pinned lockfile is the only thing
+    # choosing them and it has no reason to move.
+    #   idna    < 3.15  — idna.encode() gets past the CVE-2024-3651 fix
+    #   urllib3 < 2.7   — decompression-bomb limits can be bypassed, and
+    #                     proxied redirects leak headers across origins
+    "idna>=3.15",
     "numpy>=1.26",
     "pyyaml>=6.0.2",
     "requests>=2.32",
+    "urllib3>=2.7",
 ]
 test = [
     "aiohttp>=3.13.4",
